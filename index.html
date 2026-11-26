@@ -71,6 +71,9 @@ label{font-weight:700;font-size:14px;display:block;margin-bottom:6px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:500;z-index:9;max-width:90vw}
 code{background:var(--bg);padding:1px 6px;border-radius:5px}
 a{color:var(--acc)}
+details.hint{background:var(--bg);border-radius:10px;padding:0 14px}
+details.hint summary{min-height:44px;display:flex;align-items:center;font-weight:700;color:var(--acc);cursor:pointer}
+details.hint p{padding-bottom:12px}
 /* phone */
 .phone{max-width:520px;margin:0 auto;padding:16px 14px 40px}
 .rolecard{border-radius:16px;padding:18px;color:#fff;position:relative;overflow:hidden}
@@ -113,6 +116,62 @@ const SCEN=[
  {t:'20:00',n:'Gasprijsschok',load:.9,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
  {t:'23:00',n:'Stormnacht',load:.45,wind:1,zon:0,gas:1.6,ev:'Er trekt een storm over: windparken draaien op vol vermogen.'}
 ];
+/* hints: tactiek per rol per ronde (index = ronde-1) */
+const HINTS={
+ kern:['Weinig vraag en veel wind: de prijs kan laag uitvallen. Onder 150 MW betaal je €3.000. Wat is erger: een uur verkopen onder je kostprijs, of die boete?',
+  'De vraag trekt aan. Waarschijnlijk zet een gascentrale de prijs en verdien jij het verschil met je €12. Bied je hele vermogen aan.',
+  'Veel zon drukt de prijs. Met een laag of zelfs negatief bod op je minimumlast voorkom je dat je moet afschakelen.',
+  'Het krapste uur van de dag. Je hoeft niet hoog te bieden om de hoge prijs te krijgen: iedereen krijgt dezelfde marktprijs (pay-as-clear).',
+  'Gas wordt duurder, dus de prijs die gascentrales zetten stijgt. Jouw kosten blijven gelijk: dit is jouw uur.',
+  'Storm: wind op vol vermogen en weinig vraag. Grote kans op een heel lage of negatieve prijs. Bescherm je minimumlast.'],
+ wind:['Je marginale kosten zijn nul en wat je niet verkoopt, is verloren. Met een bod rond €0 draai je vrijwel altijd.',
+  'Matige wind en stijgende vraag: je wordt zeker afgenomen. Hoger bieden levert niets extra op, want je krijgt toch de marktprijs.',
+  'Samen met de zonneparken komt er veel gratis stroom op de markt. Hoe laag ben je bereid te gaan?',
+  'Bijna geen wind: je hebt weinig te verkopen, maar de prijs is hoog. Bied laag in, dan draai je zeker.',
+  'Een hogere gasprijs betekent een hogere marktprijs. Zorg dat je hele vermogen verkocht wordt.',
+  'Storm: je beste productie-uur, maar alle windparken draaien tegelijk. Hoe ver kan de prijs zakken? Kijk naar de nacht van vanochtend.'],
+ zon:['Het is nacht: je hebt geen vermogen. Kijk hoe de markt zich gedraagt.',
+  'De zon komt op: een beetje vermogen, tegen een prijs die waarschijnlijk door gas wordt gezet. Bied laag, dan draai je zeker.',
+  'Volle zon: jouw uur, maar ook dat van alle andere zonneparken. Bied een realistisch minimum; een negatieve prijs is mogelijk.',
+  'Nauwelijks zon meer. Bied je kleine volume laag in, dan krijg je wel de hoge piekprijs.',
+  'Na zonsondergang: geen vermogen.',
+  'Nacht: geen vermogen.'],
+ gas:['Weinig vraag en veel wind: misschien ben je niet nodig. Bied op je marginale kosten; lager bieden betekent verlies maken.',
+  'Ochtendpiek: grote kans dat jij de prijs bepaalt. Iets boven je kosten bieden kan, maar te hoog en de piekcentrale neemt het over.',
+  'Zon drukt de prijs. Komt de prijs onder je kosten, dan kun je beter niet draaien.',
+  'Krapste uur. De piekcentrale is duurder dan jij: je kunt boven je kosten bieden, zolang je onder die van de piek blijft.',
+  'Je kosten zijn 60% gestegen, naar €136/MWh. Pas je bod aan, anders verkoop je met verlies.',
+  'Storm en duur gas: grote kans dat je niet nodig bent. Bied niet onder je kosten.'],
+ piek:['Rustige nacht: je bent vrijwel zeker niet nodig. Bieden op je kosten kost niets.',
+  'Waarschijnlijk niet nodig, tenzij het aanbod tegenvalt. Bied minimaal je kosten.',
+  'Middag met veel zon: geen kans. Bied je kosten of sla over.',
+  'Dit is jouw uur. Is er zonder jou te weinig aanbod, dan bepaal jij de prijs. Hoe hoog durf je te gaan voordat afnemers afhaken?',
+  'Duurder gas maakt ook jou duurder: €240/MWh. Is de markt krap genoeg dat je nodig bent?',
+  'Stormnacht: geen kans.'],
+ bat:['Veel wind en weinig vraag: vaak een goedkoop uur. Laad als je verwacht later duurder te kunnen verkopen.',
+  'Ochtendpiek: duurder dan vannacht. Verkopen kan, maar de avondpiek wordt waarschijnlijk nog duurder.',
+  'Volle zon: vaak de laagste prijs van de dag. Laad met een lage maximumprijs.',
+  'Hoogste vraag van de dag: ontladen. Waarschijnlijk zetten dure centrales de prijs, dus je minimumprijs mag hoog zijn.',
+  'Duur gas houdt de prijs hoog. Heb je nog energie? Verkoop die dan.',
+  'Laatste ronde: lading die overblijft, levert niets meer op. Verkoop wat je nog hebt.'],
+ lev:['Dek je klantvraag, anders betaal je minstens €300/MWh onbalans. Bied je hele vraag met een ruime maximumprijs.',
+  'De vraag stijgt. Te weinig inkopen is duurder dan een hoge maximumprijs: je betaalt de marktprijs, niet je bod.',
+  'Lage prijs verwacht. Koop precies je vraag in; te veel inkopen is weggegooid geld.',
+  'Krapste uur: bied je te laag, dan krijg je niets en betaal je onbalans. Bied hoog genoeg.',
+  'Hoge prijzen door duur gas. Je tarief is €140, dus je maakt hier misschien verlies, maar onbalans is erger.',
+  'Stormnacht met een lage prijs verwacht: koop je hele vraag in.'],
+ ind:['Weinig vraag en veel wind: kans op een prijs onder €120. Bied maximaal je waarde.',
+  'Ochtendpiek: de prijs ligt waarschijnlijk rond de kosten van gas (~€85). Onder €120 maak je nog winst.',
+  'Volle zon: mogelijk de goedkoopste stroom van de dag. Koop vol in.',
+  'Krapste uur: waarschijnlijk boven €120. Stilstaan is dan beter dan verlies maken.',
+  'Duur gas: een prijs boven €120 ligt voor de hand. Overweeg niet te kopen.',
+  'Storm: lage prijs verwacht. Draai op vol vermogen.'],
+ ev:['Je moet vandaag 450 MWh laden, maximaal 150 per ronde. Een nacht met veel wind is een goed moment om te beginnen.',
+  'Ochtendpiek: duurder. Kun je het laden uitstellen naar goedkopere uren? Je hebt nog vier rondes.',
+  'Volle zon: waarschijnlijk goedkoop. Laad vol.',
+  'Duurste uur van de dag: sla liever over, tenzij je achterloopt met laden.',
+  'Duur gas. Hoeveel moet je nog laden? Elke MWh tekort kost straks €400.',
+  'Laatste ronde: wat je nu niet laadt, kost €400/MWh boete. Bied genoeg om zeker te laden.']};
 const CAP=4000,FLOOR=-500,TARIEF=140,MINRUN=150,BATMAX=200,EVNEED=450,EVPEN=400;
 const mc=(r,s)=>r==='kern'?12:r==='gas'?Math.round(85*s.gas):r==='piek'?Math.round(150*s.gas):0;
 const demandOf=(st,s)=>Math.round((st.params?.L||0)*s.load);
@@ -256,8 +315,9 @@ function renderTeacher(){const app=$('#app');if(!loaded){return;}
  if(ph==='lobby')btn=`<button class="acc" data-a="start" ${np<2?'disabled':''}>Start de handelsdag</button>`;
  else if(ph==='bid')btn=`<button class="ghost" data-a="t60">Timer 60 s</button><button class="ghost" data-a="t90">90 s</button><button class="px" data-a="close">Sluit markt en bereken</button>`;
  else if(ph==='res')btn=`<button class="acc" data-a="next">${state.round>=SCEN.length?'Bekijk eindstand':'Volgende ronde'}</button>`;
+ const hintBtn=ph!=='end'?`<button class="ghost" data-a="hints" aria-pressed="${state.hints!==false}">Hints ${state.hints!==false?'aan':'uit'}</button>`:'';
  const reset=`<button class="ghost" data-a="reset">${confirmReset?'Zeker weten? Klik nogmaals':'Nieuw spel'}</button>`;
- const head=`<div class="top"><div><h1>Stroombeurs</h1><p class="mute">Day-ahead veiling met één marktprijs (pay-as-clear) · ${np} spelers · spelcode <b>${esc(code)}</b></p></div><div class="row">${ph!=='lobby'&&ph!=='end'?`<span class="badge">Ronde ${state.round}/${SCEN.length} · ${s.t}</span>`:''}${btn}${reset}</div></div>`;
+ const head=`<div class="top"><div><h1>Stroombeurs</h1><p class="mute">Day-ahead veiling met één marktprijs (pay-as-clear) · ${np} spelers · spelcode <b>${esc(code)}</b></p></div><div class="row">${ph!=='lobby'&&ph!=='end'?`<span class="badge">Ronde ${state.round}/${SCEN.length} · ${s.t}</span>`:''}${btn}${hintBtn}${reset}</div></div>`;
  let body='';
  if(ph==='lobby'){
   body=`<div class="grid"><div class="card stack-v"><h2>Spelers en rollen</h2><p class="mute small">Studenten scannen de QR-code, of gaan naar de link en vullen code ${esc(code)} in. Daarna kiezen ze een naam. Ze krijgen automatisch een rol in een vaste volgorde, zodat vraag en aanbod in balans blijven. Tik op een rol om die te wijzigen.</p>
@@ -329,7 +389,8 @@ function renderStudent(){const app=$('#app');
   <div class="rolecard" style="background:${R.col}"><svg viewBox="0 0 120 120" aria-hidden="true">${ICON[pl.role]}</svg><p style="opacity:.85;margin:0">${esc(pl.name)}</p><h2>${R.n}</h2><p style="max-width:85%">${R.tip}</p></div>
   ${mid}
   <div class="card"><div class="resline"><span>Totaal resultaat</span><b class="${pl.tot<0?'neg':'pos'}">${eur(pl.tot)}</b></div><div class="resline" style="border:0"><span>Positie</span><b>${rank} van ${n}</b></div></div></div>`;
- bindForm(pl,s);updStudent();}
+ bindForm(pl,s);const hd=$('details.hint');if(hd){hd.open=hintOpenRound===state.round;hd.addEventListener('toggle',()=>{hintOpenRound=hd.open?state.round:0;});}updStudent();}
+let hintOpenRound=0;
 function facts(pl,s){const r=pl.role,f=[];
  if(ROLES[r].side==='s'){f.push(['Beschikbaar vermogen',num(maxQ(pl,s,state))+' MW']);f.push(['Marginale kosten',eur(mc(r,s))+'/MWh']);}
  if(r==='bat')f.push(['Laadtoestand',num(pl.soc)+' / '+BATMAX+' MWh']);
@@ -340,7 +401,7 @@ function facts(pl,s){const r=pl.role,f=[];
 function bidForm(pl,s){const k=state.round+'|'+pl.role;if(draftKey!==k){draft=defBid(pl,s,state);draftKey=k;}
  const sell=pl.role==='bat'?draft.m==='ontladen':ROLES[pl.role].side==='s';const mx=maxQ(pl,s,state,draft.m);if(draft.q>mx)draft.q=mx;
  const prev=state.result?`<p class="mute small">Vorige ronde (${SCEN[state.result.round-1].t}): ${state.result.P==null?'geen handel':eur(state.result.P)+'/MWh'}</p>`:'';
- return`<div class="card stack-v"><div class="row between"><h2>${s.t} · ${esc(s.n)}</h2><span class="timer" id="timer"></span></div><p class="event">${esc(s.ev)}</p>${prev}<div>${facts(pl,s)}</div></div>
+ return`<div class="card stack-v"><div class="row between"><h2>${s.t} · ${esc(s.n)}</h2><span class="timer" id="timer"></span></div><p class="event">${esc(s.ev)}</p>${prev}<div>${facts(pl,s)}</div>${state.hints!==false&&HINTS[pl.role]?`<details class="hint"><summary>Hint: tactiek voor deze ronde</summary><p>${HINTS[pl.role][state.round-1]||''}</p></details>`:''}</div>
  <form class="card stack-v" id="bid">
   ${pl.role==='bat'?`<div class="seg"><button type="button" data-m="laden" class="${draft.m==='laden'?'on':''}">Laden (kopen)</button><button type="button" data-m="ontladen" class="${draft.m==='ontladen'?'on':''}">Ontladen (verkopen)</button></div>`:''}
   <div><label for="q">${sell?'Hoeveel wil je verkopen?':'Hoeveel wil je kopen?'} <span class="mute">(max ${num(mx)} MW)</span></label>
@@ -372,7 +433,7 @@ function resultCard(pl,end){const L=pl.last,res=state.result;
 document.addEventListener('click',e=>{if(!teacher)return;const t=e.target.closest('button');if(!t||!state)return;const a=t.dataset.a;
  if(a!=='reset')confirmReset=false;
  if(a==='start')startGame();else if(a==='close')closeMarket();else if(a==='next')nextRound();
- else if(a==='t60')setTimer(60);else if(a==='t90')setTimer(90);else if(a==='bots')addBots();
+ else if(a==='t60')setTimer(60);else if(a==='t90')setTimer(90);else if(a==='bots')addBots();else if(a==='hints'){const st=clone(state);st.hints=state.hints===false;save(st);}
  else if(a==='reset'){if(confirmReset){confirmReset=false;G.child('bids').remove().catch(()=>{});const st=freshState();for(const[k,p]of Object.entries(state.players))if(!p.bot)st.players[k]={name:p.name,role:p.role,tot:0,soc:100,chg:0,last:null};save(st);}else{confirmReset=true;render();}}
  else if(t.dataset.role){const st=clone(state),p=st.players[t.dataset.role];if(p){p.role=ORDER[(ORDER.indexOf(p.role)+1)%ORDER.length];save(st);}}
  else if(t.dataset.del){const k=t.dataset.del,st=clone(state);delete st.players[k];if(!k.startsWith('bot-'))G.child('players/'+k).remove().catch(()=>{});save(st);}});

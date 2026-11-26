@@ -50,6 +50,7 @@ Lokaal testen kan ook. Draai `python3 -m http.server` in deze map en open <http:
 4. Na zes rondes volgen de eindstand, de beste speler per rol en het prijsverloop van de dag.
 
 **Tips**
+- Studenten kunnen per ronde een **hint** openen met een tactiek voor hun rol in dat scenario. Met de knop **Hints aan/uit** op het docentscherm zet je ze voor iedereen uit, bijvoorbeeld in een tweede speelronde.
 - Weinig studenten? Klik op **Aanvullen met bots**. Dan komt er alleen een bot bij voor elke rol die nog geen speler heeft. Een bot verwijder je met het kruisje.
 - Zelf de studentenweergave bekijken: open de spellink in een privévenster of op je telefoon.
 - Gebruik als docent steeds **dezelfde browser**. Firebase herkent je als eigenaar via een anonieme login die in die browser bewaard blijft. Op de startpagina staat een knop **Terug naar spel …**.
