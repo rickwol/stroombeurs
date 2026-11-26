@@ -70,6 +70,13 @@ Lokaal testen kan ook. Draai `python3 -m http.server` in deze map en open <http:
 | Industrie | vraag | Tot 250 MW; stroom levert €120/MWh op |
 | Laadplein-exploitant | vraag | Tot 150 MW per ronde, verkoopt voor €250/MWh; moet 450 MWh per dag laden, tekort kost €400/MWh |
 
+**Winnaar:** de eindstand rangschikt op **% van verdienpotentieel**, niet op euro's, omdat rollen sterk verschillen in wat ze kunnen verdienen. Verdienpotentieel is wat je met jouw installatie had kunnen verdienen als je alle marktprijzen van de dag vooraf had gekend (als prijsnemer):
+- **Producenten en industrie:** vol vermogen in elke ronde waarin dat winst oplevert.
+- **Batterij:** de optimale laad- en ontlaadvolgorde.
+- **Laadplein:** 450 MWh laden in de goedkoopste rondes.
+
+Boven 100% betekent dat je de prijs in je voordeel hebt beïnvloed. Leveranciers worden gescoord op inkoopkosten (ideaal ÷ werkelijk, inclusief onbalans). Wie geen winstkans had en geen verlies leed, scoort 100%. Het eindscherm toont ook de beste per rol en het hoogste euroresultaat.
+
 **Vereffening:** biedingen worden gesorteerd tot een aanbodcurve (oplopend) en een vraagcurve (aflopend). De marginale eenheid in het snijpunt bepaalt één prijs voor iedereen. Gelijke biedingen op de marge worden naar rato toegewezen. De prijsgrenzen zijn −€500 en €4.000/MWh.
 
 Scenario's, kosten en rollen staan bovenaan het script in `index.html` (`ROLES` en `SCEN`) en zijn makkelijk aan te passen.

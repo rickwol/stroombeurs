@@ -187,7 +187,7 @@ function syncPlayers(){if(!teacher||!state||!loaded)return;let ch=false;const st
   if(!st.players[pid]){st.players[pid]={name,role:ORDER[Object.keys(st.players).length%ORDER.length],tot:0,soc:100,chg:0,last:null};ch=true;}
   else if(st.players[pid].name!==name){st.players[pid].name=name;ch=true;}}
  if(ch)save(st);}
-function startGame(){const st=clone(state);for(const p of Object.values(st.players)){p.tot=0;p.soc=100;p.chg=0;p.last=null;delete p.pen;}
+function startGame(){const st=clone(state);for(const p of Object.values(st.players)){p.tot=0;p.soc=100;p.chg=0;p.cost=0;p.last=null;delete p.pen;delete p.pot;delete p.pct;delete p.tag;}
  st.params={L:computeL(st.players)};st.phase='bid';st.round=1;st.result=null;st.hist=[];st.deadline=0;
  G.child('bids').remove().catch(()=>{}).then(()=>save(st));}
 function closeMarket(){const st=clone(state),s=SCEN[st.round-1],sup=[],dem=[],bids={};
@@ -196,7 +196,7 @@ function closeMarket(){const st=clone(state),s=SCEN[st.round-1],sup=[],dem=[],bi
  const R=clear(sup,dem),P=R.P??0;
  for(const[k,pl]of Object.entries(st.players)){const b=bids[k],q=R.acc[k]||0,r=pl.role;let pr=0,note='';
   if(r==='bat'){if(b?.m==='laden'){pr=-q*P;pl.soc=Math.min(BATMAX,Math.round((pl.soc+q*.9)*10)/10);}else{pr=q*P;pl.soc=Math.max(0,pl.soc-q);}note='Laadtoestand nu '+num(pl.soc)+' MWh';}
-  else if(r==='lev'){const D=demandOf(st,s),sh=Math.max(0,D-q),imb=Math.max(300,2*P);pr=D*TARIEF-q*P-sh*imb;if(sh>0)note='Tekort '+num(sh)+' MW tegen onbalansprijs '+eur(imb)+'/MWh';}
+  else if(r==='lev'){const D=demandOf(st,s),sh=Math.max(0,D-q),imb=Math.max(300,2*P);pr=D*TARIEF-q*P-sh*imb;pl.cost=Math.round((pl.cost||0)+q*P+sh*imb);if(sh>0)note='Tekort '+num(sh)+' MW tegen onbalansprijs '+eur(imb)+'/MWh';}
   else if(r==='ind')pr=q*(120-P);
   else if(r==='ev'){pr=q*(250-P);pl.chg+=q;note='Vandaag geladen: '+num(pl.chg)+' van '+EVNEED+' MWh';}
   else{pr=q*(P-mc(r,s));if(r==='kern'&&q<MINRUN){pr-=3000;note='Onder de minimumlast: €3.000 extra kosten';}}
@@ -205,8 +205,26 @@ function closeMarket(){const st=clone(state),s=SCEN[st.round-1],sup=[],dem=[],bi
  st.result={round:st.round,P:R.P,V:R.V,sup:sup.map(b=>[b.r,b.q,b.p,R.acc[b.k]||0]),dem:dem.map(b=>[b.r,b.q,b.p,R.acc[b.k]||0])};
  st.hist.push(R.P==null?'none':R.P);st.phase='res';st.deadline=0;save(st);}
 function nextRound(){const st=clone(state);
- if(st.round>=SCEN.length){for(const p of Object.values(st.players))if(p.role==='ev'){p.pen=Math.round(Math.max(0,EVNEED-p.chg)*EVPEN);p.tot-=p.pen;}st.phase='end';}
+ if(st.round>=SCEN.length){for(const p of Object.values(st.players))if(p.role==='ev'){p.pen=Math.round(Math.max(0,EVNEED-p.chg)*EVPEN);p.tot-=p.pen;}for(const p of Object.values(st.players)){const sc=scoreOf(p,st);p.pot=sc.pot;p.pct=Math.round(sc.pct*10)/10;p.tag=sc.tag||'';}st.phase='end';}
  else{st.round++;st.phase='bid';}st.deadline=0;save(st);}
+/* verdienpotentieel: wat je met perfecte kennis van de prijzen achteraf had kunnen verdienen (als prijsnemer) */
+function potentialOf(pl,st){const r=pl.role,Ps=(st.hist||[]).map(hv),rounds=SCEN.map((s,i)=>({s,P:Ps[i]})).filter(x=>x.P!=null);let pot=0;
+ if(r==='wind'||r==='zon'||r==='gas'||r==='piek')for(const{s,P}of rounds)pot+=Math.max(0,P-mc(r,s))*maxQ(pl,s,st);
+ else if(r==='kern')for(const{P}of rounds)pot+=Math.max(300*(P-12),MINRUN*(P-12),MINRUN*(P-12)-3000,-3000);
+ else if(r==='ind')for(const{P}of rounds)pot+=Math.max(0,120-P)*250;
+ else if(r==='ev'){let tot=0;for(const P of rounds.map(x=>x.P).sort((a,b)=>a-b)){let q=0;if(250-P>0)q=150;else if(tot<EVNEED&&650-P>0)q=Math.min(150,EVNEED-tot);pot+=q*(250-P);tot+=q;}pot-=Math.max(0,EVNEED-tot)*EVPEN;}
+ else if(r==='bat'){let V=new Map([[100,0]]);for(const{P}of rounds){const N=new Map();for(const[soc,v]of V)for(let q=0;q<=100;q+=10){
+   if(q<=soc){const k=soc-q,val=v+q*P;if(!(N.get(k)>=val))N.set(k,val);}const k2=Math.round(soc+q*.9);if(k2<=BATMAX){const val=v-q*P;if(!(N.get(k2)>=val))N.set(k2,val);}}V=N;}pot=Math.max(...V.values());}
+ return Math.round(pot);}
+function scoreOf(pl,st){
+ if(pl.role==='lev'){const Ps=(st.hist||[]).map(hv);let ideal=0;SCEN.forEach((s,i)=>{const P=Ps[i];if(P==null)return;const D=demandOf(st,s);ideal+=P>=0?D*P:1.5*D*P;});
+  ideal=Math.round(ideal);const act=pl.cost||0;return{pot:ideal,pct:ideal>0&&act>0?ideal/act*100:(act<=ideal?100:0)};}
+ const pot=potentialOf(pl,st),act=pl.tot;
+ if(pot>0)return{pot,pct:act/pot*100};
+ return{pot,pct:act>=pot?100:Math.max(0,100*(1-(pot-act)/Math.max(Math.abs(pot),3000))),tag:'geen winstkans'};}
+const pctTxt=v=>(Math.round(v)).toLocaleString('nl-NL')+'%';
+const potTxt=p=>p.role==='lev'?'inkoop '+eur(p.cost||0)+' · ideaal '+eur(p.pot):eur(p.tot)+' van '+eur(p.pot)+(p.tag?' · '+p.tag:'');
+const byPct=()=>Object.entries(state?.players||{}).sort((a,b)=>((b[1].pct??-1e9)-(a[1].pct??-1e9))||((b[1].pot||0)-(a[1].pot||0)));
 function setTimer(sec){const st=clone(state);st.deadline=sec?now()+sec*1000:0;save(st);}
 function missingRoles(){const have=new Set(Object.values(state?.players||{}).map(p=>p.role));return ORDER.filter(r=>!have.has(r));}
 function addBots(){const miss=missingRoles();if(!miss.length)return toast('Alle rollen zijn al bezet');const st=clone(state);miss.forEach((r,i)=>{st.players['bot-'+Date.now().toString(36)+i]={name:'Bot '+ROLES[r].n,role:r,bot:true,tot:0,soc:100,chg:0,last:null};});save(st);toast(miss.length+(miss.length===1?' bot':' bots')+' toegevoegd');}
@@ -248,8 +266,10 @@ function renderTeacher(){const app=$('#app');if(!loaded){return;}
    <div class="stack-v"><div class="card stack-v" style="text-align:center"><p class="mute" style="margin:0">Spelcode</p><div class="big" style="color:var(--acc);letter-spacing:.06em">${esc(code)}</div><div id="qr" style="display:grid;place-items:center;padding:12px;background:#fff;border-radius:12px;margin-inline:auto;width:fit-content"></div><p class="small" style="overflow-wrap:anywhere">${esc(joinUrl())}</p></div><div class="card stack-v"><h2>Zo werkt het</h2><p>Elke ronde is één uur van de dag. Producenten bieden volume en een minimumprijs, afnemers volume en een maximumprijs. De markt sorteert alle biedingen in de merit order en de duurste nog benodigde eenheid bepaalt de prijs voor iedereen.</p><p class="mute small">Zes rondes: nacht, ochtendpiek, zonnige middag, windstille avond, gasprijsschok en stormnacht.</p></div>
    <div class="card"><h3>Rollen</h3><div class="legend">${ORDER.map(r=>`<span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span>`).join('')}</div></div></div></div>`;
  }else if(ph==='end'){
-  body=`<div class="grid"><div class="card stack-v"><h2>Eindstand</h2>${leaderboard(50)}${sorted().some(([,p])=>p.pen)?'<p class="mute small">Laadplein-exploitanten zijn gecorrigeerd voor niet-geladen energie (€400/MWh).</p>':''}</div>
-   <div class="stack-v"><div class="card stack-v"><h2>Prijsverloop van de dag</h2>${history()}</div><div class="card stack-v"><h2>Beste per rol</h2>${ORDER.map(r=>{const b=sorted().find(([,p])=>p.role===r);return b?`<div class="row between"><span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span><span>${esc(b[1].name)} · <b>${eur(b[1].tot)}</b></span></div>`:''}).join('')}</div></div></div>`;
+  body=`<div class="grid"><div class="card stack-v"><h2>Eindstand: % van verdienpotentieel</h2><p class="mute small">Verdienpotentieel = wat je met jouw installatie had kunnen verdienen als je alle prijzen van vandaag vooraf had gekend. Boven 100%: je hebt de prijs in je voordeel beïnvloed. Leveranciers worden gescoord op inkoopkosten (ideaal ÷ werkelijk).</p>
+   <div class="lb">${byPct().map(([k,p],i)=>`<div><span class="mute">${i+1}</span><i class="dot" style="background:${ROLES[p.role].col}"></i><em>${esc(p.name)} <span class="mute small">${ROLES[p.role].n} · ${potTxt(p)}</span></em><b class="${(p.pct??0)<50?'neg':''}">${p.pct==null?'—':pctTxt(p.pct)}</b></div>`).join('')}</div>
+   ${sorted().some(([,p])=>p.pen)?'<p class="mute small">Laadplein-exploitanten zijn gecorrigeerd voor niet-geladen energie (€400/MWh).</p>':''}</div>
+   <div class="stack-v"><div class="card stack-v"><h2>Prijsverloop van de dag</h2>${history()}</div><div class="card stack-v"><h2>Beste per rol</h2>${ORDER.map(r=>{const b=byPct().find(([,p])=>p.role===r);return b?`<div class="row between"><span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span><span>${esc(b[1].name)} · <b>${b[1].pct==null?'—':pctTxt(b[1].pct)}</b></span></div>`:''}).join('')}</div><div class="card stack-v"><h2>Hoogste euroresultaat</h2>${leaderboard(5)}</div></div></div>`;
  }else{
   const res=state.result,showRes=ph==='res'&&res;
   const inn=Object.entries(state.players).map(([k,p])=>{const on=p.bot||!!bidOf(k);return`<span class="chip ${on?'on':''}"><i class="dot" style="background:${ROLES[p.role].col}"></i>${esc(p.name)}</span>`;}).join('');
@@ -300,7 +320,7 @@ function renderStudent(){const app=$('#app');
   <form class="card stack-v" id="join"><div><label for="nm">Je naam of teamnaam</label><input id="nm" maxlength="24" autocomplete="nickname" required></div><button class="acc" type="submit">Meedoen</button></form></div>`;
   $('#join').addEventListener('submit',e=>{e.preventDefault();const v=$('#nm').value.trim().slice(0,24);if(!v)return;join(v);render();});return;}
  if(!pl){app.innerHTML=`<div class="phone stack-v"><h1>Stroombeurs</h1><div class="card"><p><b>Hoi ${esc(me.name)}!</b></p><p class="mute pulse">Wachten tot de docent je een rol geeft…</p></div></div>`;return;}
- const R=ROLES[pl.role];const rank=sorted().findIndex(([k])=>k===me.key)+1,n=Object.keys(state.players).length;
+ const R=ROLES[pl.role];const rank=(ph==='end'?byPct():sorted()).findIndex(([k])=>k===me.key)+1,n=Object.keys(state.players).length;
  let mid='';
  if(ph==='lobby')mid=`<div class="card"><p><b>Wacht tot de docent de handelsdag start.</b></p><p class="mute">Lees intussen je rol goed door.</p></div>`;
  else if(ph==='bid')mid=bidForm(pl,s);
@@ -340,7 +360,7 @@ function bindForm(pl,s){const f=$('#bid');if(!f)return;const q=$('#q'),qr=$('#qr
   G.child('bids/'+state.round+'/'+uid).set(pl.role==='bat'?{q:b.q,p:b.p,m:b.m}:{q:b.q,p:b.p}).then(()=>{submittedFor=draftKey;lastSig='';render();}).catch(()=>toast('Indienen mislukt. Is de markt al gesloten?'));});}
 function updStudent(){const st=$('#st'),sub=$('#sub');if(st){const done=submittedFor===draftKey;st.textContent=done?'Bod ingediend. Je kunt het nog aanpassen tot de markt sluit.':'';if(sub)sub.textContent=done?'Bod bijwerken':'Bod indienen';}tick();}
 function resultCard(pl,end){const L=pl.last,res=state.result;
- if(end)return`<div class="card stack-v"><h2>Einde handelsdag</h2>${pl.pen?`<p class="neg">Boete voor ${num(EVNEED-pl.chg)} MWh die je niet hebt geladen: ${eur(pl.pen)}</p>`:''}<p class="mute">Kijk naar het scherm voor de eindstand en de nabespreking.</p></div>`;
+ if(end)return`<div class="card stack-v"><h2>Einde handelsdag</h2>${pl.pen?`<p class="neg">Boete voor ${num(EVNEED-pl.chg)} MWh die je niet hebt geladen: ${eur(pl.pen)}</p>`:''}${pl.pct!=null?`<div><div class="resline"><span>Score</span><b>${pctTxt(pl.pct)} van je potentieel</b></div>${pl.role==='lev'?`<div class="resline"><span>Jouw inkoopkosten</span><b>${eur(pl.cost||0)}</b></div><div class="resline"><span>Ideale inkoopkosten</span><b>${eur(pl.pot)}</b></div>`:`<div class="resline"><span>Jouw resultaat</span><b>${eur(pl.tot)}</b></div><div class="resline"><span>Maximaal haalbaar</span><b>${eur(pl.pot)}</b></div>`}</div>${pl.tag?'<p class="mute small">Je had vandaag geen winstkans; zonder verlies scoor je 100%.</p>':''}`:''}<p class="mute">Kijk naar het scherm voor de eindstand en de nabespreking.</p></div>`;
  if(!L||L.r!==state.round)return`<div class="card"><p class="mute">Je hebt deze ronde niet geboden.</p></div>`;
  const sell=pl.role==='bat'?L.bid?.m==='ontladen':ROLES[pl.role].side==='s';
  return`<div class="card stack-v"><h2>Uitslag ${SCEN[state.round-1].t}</h2><div><div class="resline"><span>Marktprijs</span><b>${res?.P==null?'geen handel':eur(res.P)+'/MWh'}</b></div>
