@@ -3,7 +3,12 @@
 Een klassikaal multiplayer-spel: studenten handelen met hun telefoon in een day-ahead veiling met uniforme prijs (pay-as-clear). De docent projecteert de merit order, de marktprijs en de ranglijst.
 
 - **Negen rollen:** kerncentrale, windpark, zonnepark, gascentrale, piekcentrale, batterij, energieleverancier, industrie (elektrolyser) en laadplein-exploitant.
-- **Zes rondes:** nacht, ochtendpiek, zonnige middag, windstille avondpiek, gasprijsschok en stormnacht.
+- **Vijf speldagen van zes rondes.** Je kiest er één in de lobby:
+  - **Standaard:** nacht, ochtendpiek, zonnige middag, windstille avondpiek, gasprijsschok en stormnacht.
+  - **Winter (krapte):** hoge vraag door warmtepompen, duur gas, Dunkelflaute en een storing in de kerncentrale.
+  - **Lente (overschot):** veel wind en zon bij lage vraag op een feestdag.
+  - **Zomer (eendencurve):** subsidie voor wind en zon, negatieve prijzen op Pinksterzondag, een hittegolf die centrales beperkt, en een steile avondpiek.
+  - **Herfst (onvoorspelbaar):** stormen en een gasprijs die schiet.
 - Studenten hebben **geen account** nodig: ze scannen een QR-code en vullen een naam in.
 
 Het spel is één statische pagina (`index.html`) op GitHub Pages. Firebase Realtime Database zorgt voor de live verbinding.
@@ -80,7 +85,7 @@ Boven 100% betekent dat je de prijs in je voordeel hebt beïnvloed. Leveranciers
 
 **Vereffening:** biedingen worden gesorteerd tot een aanbodcurve (oplopend) en een vraagcurve (aflopend). De marginale eenheid in het snijpunt bepaalt één prijs voor iedereen. Gelijke biedingen op de marge worden naar rato toegewezen. De prijsgrenzen zijn −€500 en €4.000/MWh.
 
-Scenario's, kosten en rollen staan bovenaan het script in `index.html` (`ROLES` en `SCEN`) en zijn makkelijk aan te passen.
+Speldagen, kosten en rollen staan bovenaan het script in `index.html` (`SEASONS` en `ROLES`) en zijn makkelijk aan te passen. Een scenario kan naast vraag, wind, zon en gas ook `kern` (beschikbaarheid van de kerncentrale), `therm` (beschikbaarheid van gas- en piekcentrales, bijvoorbeeld bij warm koelwater) en `sub` (subsidie in €/MWh voor wind en zon) hebben. Bij de seizoensdagen worden de hints automatisch uit het scenario afgeleid.
 
 ## Onderhoud
 - Elk spel staat in de database onder `games/<code>`. Oude spellen kun je in de Firebase-console verwijderen, onder `games` en `owners`.

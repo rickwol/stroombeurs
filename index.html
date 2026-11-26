@@ -85,6 +85,11 @@ label{font-weight:600;font-size:14px;display:block;margin-bottom:8px;color:#cfd5
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:#cfd5e4}
 .event{border-left:3px solid var(--px);padding:4px 0 4px 12px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--volt);color:var(--volt-ink);padding:10px 16px;border-radius:12px;font-weight:600;z-index:9;max-width:90vw}
+.seasons{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.season{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:12px 14px;min-height:auto;border-radius:14px;font-weight:500}
+.season span{font-size:13px;color:var(--mute);font-weight:400;line-height:1.35}
+.season.on{border-color:var(--volt);box-shadow:0 0 0 1px var(--volt),0 0 30px -10px var(--volt)}
+.season.on b{color:var(--volt)}
 .phone{max-width:520px;margin:0 auto;padding:4px 14px 40px}
 .rolecard{border-radius:22px;padding:20px;position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--rc) 38%,#0b0d14),#0b0d14 75%);border:1px solid color-mix(in srgb,var(--rc) 55%,transparent);box-shadow:0 0 60px -20px var(--rc)}
 .rolecard svg{position:absolute;right:-6px;top:-6px;width:130px;height:130px;opacity:.9;filter:drop-shadow(0 0 18px var(--rc))}
@@ -132,14 +137,46 @@ const ROLES={
  ev:{n:'Laadplein-exploitant',side:'d',cap:150,col:'#3fa9ff',tip:'Je verkoopt laadstroom aan EV-rijders voor €250/MWh. Over de hele dag moet je 450 MWh laden; elk tekort aan het eind kost €400/MWh. Maximaal 150 MW per ronde.'}
 };
 const ORDER=['lev','gas','wind','ind','kern','zon','bat','ev','piek'];
-const SCEN=[
- {t:'03:00',n:'Nacht',load:.42,wind:.75,zon:0,gas:1,ev:'Rustige nacht met behoorlijk wat wind.'},
- {t:'08:00',n:'Ochtendpiek',load:.85,wind:.45,zon:.25,gas:1,ev:'Iedereen staat op; de zon komt langzaam op.'},
- {t:'13:00',n:'Zonnige middag',load:.52,wind:.35,zon:1,gas:1,ev:'Volle zon op alle panelen. Zakt de prijs onder nul?'},
- {t:'18:00',n:'Windstille avondpiek',load:1,wind:.08,zon:.05,gas:1,ev:'Bijna geen wind, geen zon en de hoogste vraag van de dag.'},
- {t:'20:00',n:'Gasprijsschok',load:.9,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
- {t:'23:00',n:'Stormnacht',load:.45,wind:1,zon:0,gas:1.6,ev:'Er trekt een storm over: windparken draaien op vol vermogen.'}
-];
+/* speldagen: standaard + vier seizoenen. sky = scène; kern/therm = beschikbaarheid (0-1); sub = subsidie €/MWh voor wind en zon */
+const SEASONS={
+ standaard:{n:'Standaard',d:'Klassieke dag: van nacht tot stormnacht',fx:{},scen:[
+  {t:'03:00',n:'Nacht',sky:'night',load:.42,wind:.75,zon:0,gas:1,ev:'Rustige nacht met behoorlijk wat wind.'},
+  {t:'08:00',n:'Ochtendpiek',sky:'dawn',load:.85,wind:.45,zon:.25,gas:1,ev:'Iedereen staat op; de zon komt langzaam op.'},
+  {t:'13:00',n:'Zonnige middag',sky:'noon',load:.52,wind:.35,zon:1,gas:1,ev:'Volle zon op alle panelen. Zakt de prijs onder nul?'},
+  {t:'18:00',n:'Windstille avondpiek',sky:'dusk',load:1,wind:.08,zon:.05,gas:1,ev:'Bijna geen wind, geen zon en de hoogste vraag van de dag.'},
+  {t:'20:00',n:'Gasprijsschok',sky:'red',load:.9,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
+  {t:'23:00',n:'Stormnacht',sky:'storm',load:.45,wind:1,zon:0,gas:1.6,ev:'Er trekt een storm over: windparken draaien op vol vermogen.'}]},
+ winter:{n:'Winter',d:'Krapte: hoge vraag, duur gas, Dunkelflaute en een storing',fx:{snow:1},scen:[
+  {t:'03:00',n:'Vriesnacht',sky:'night',load:.6,wind:.5,zon:0,gas:1.4,ev:'Het vriest: warmtepompen draaien ook ’s nachts door. Matige wind.'},
+  {t:'08:00',n:'Koude ochtendpiek',sky:'dawn',load:.95,wind:.35,zon:.05,gas:1.4,ev:'Iedereen zet de verwarming hoger. De zon komt pas om half negen op.'},
+  {t:'12:00',n:'Grijze middag',sky:'grey',load:.8,wind:.25,zon:.25,gas:1.4,ev:'Zwaar bewolkt: de zonneparken leveren maar een kwart.'},
+  {t:'17:30',n:'Dunkelflaute',sky:'night',load:1,wind:.03,zon:0,gas:1.4,ev:'Donker, ijskoud en windstil: de hoogste vraag van het jaar.'},
+  {t:'19:00',n:'Storing kerncentrale',sky:'red',load:1,wind:.1,zon:0,gas:1.4,kern:0,ev:'De kerncentrale valt onverwacht uit: 300 MW minder aanbod.'},
+  {t:'23:00',n:'Wind steekt op',sky:'night',load:.7,wind:.8,zon:0,gas:1.4,kern:0,ev:'Een front brengt wind. De kerncentrale is nog niet terug.'}]},
+ lente:{n:'Lente',d:'Overschot: wind en zon bij lage vraag op een feestdag',fx:{blossom:1},scen:[
+  {t:'04:00',n:'Winderige nacht',sky:'night',load:.4,wind:.85,zon:0,gas:1,ev:'Lage vraag en een stevige westenwind.'},
+  {t:'09:00',n:'Hemelvaartsdag',sky:'dawn',load:.5,wind:.7,zon:.5,gas:1,ev:'Feestdag: kantoren en fabrieken zijn dicht, de vraag blijft laag.'},
+  {t:'13:00',n:'Zon én wind',sky:'noon',load:.42,wind:.65,zon:1,gas:1,ev:'Volop zon en wind bij een lage vraag: dit wordt een overschot.'},
+  {t:'16:00',n:'Buien',sky:'grey',load:.55,wind:.9,zon:.3,gas:1,ev:'Buien trekken over: de zon valt weg, de wind trekt aan.'},
+  {t:'19:00',n:'Lenteavond',sky:'dusk',load:.75,wind:.4,zon:.05,gas:1,ev:'De wind gaat liggen en de zon gaat onder.'},
+  {t:'23:00',n:'Rustige nacht',sky:'night',load:.45,wind:.35,zon:0,gas:1,ev:'Weinig wind en weinig vraag.'}]},
+ zomer:{n:'Zomer',d:'Eendencurve en negatieve prijzen, met een hittegolf',fx:{heat:1},scen:[
+  {t:'04:00',n:'Warme nacht',sky:'night',load:.45,wind:.2,zon:0,gas:1,ev:'Een windstille, warme nacht.'},
+  {t:'10:00',n:'Zonnige ochtend',sky:'noon',load:.55,wind:.25,zon:.75,gas:1,ev:'De zon klimt snel: zonneparken draaien al op driekwart.'},
+  {t:'13:00',n:'Pinksterzondag',sky:'heat',load:.15,wind:1,zon:1,gas:1,sub:60,ev:'Pinksterzondag, onbewolkt en een stevige bries: veel meer aanbod dan vraag. Wind- en zonneparken krijgen €60/MWh subsidie bovenop de marktprijs.'},
+  {t:'15:00',n:'Hittegolf',sky:'heat',load:.65,wind:.1,zon:.9,gas:1,therm:.7,sub:60,ev:'Het rivierwater is te warm: gas- en kerncentrales mogen maar 70% leveren. Airco’s draaien vol.'},
+  {t:'21:00',n:'Zonsondergang',sky:'dusk',load:.95,wind:.1,zon:0,gas:1,therm:.7,ev:'De zon is weg, maar de airco’s draaien nog: de eendencurve schiet omhoog.'},
+  {t:'23:30',n:'Tropische nacht',sky:'night',load:.6,wind:.15,zon:0,gas:1,therm:.85,ev:'Het koelt nauwelijks af; centrales zijn nog beperkt.'}]},
+ herfst:{n:'Herfst',d:'Onvoorspelbaar: stormen en een onzekere gasprijs',fx:{leaves:1},scen:[
+  {t:'02:00',n:'Herfststorm',sky:'storm',load:.45,wind:1,zon:0,gas:1.2,ev:'Een storm trekt over het land: windparken op vol vermogen.'},
+  {t:'07:30',n:'Storm gaat liggen',sky:'dawn',load:.85,wind:.35,zon:.05,gas:1.2,ev:'De wind neemt sneller af dan voorspeld.'},
+  {t:'12:00',n:'Wisselvallig',sky:'grey',load:.7,wind:.6,zon:.45,gas:1.2,ev:'Zon en buien wisselen elkaar af.'},
+  {t:'17:00',n:'Gasprijs schiet omhoog',sky:'dusk',load:.9,wind:.2,zon:.05,gas:1.8,ev:'Spanningen op de gasmarkt: de gasprijs ligt 80% boven normaal.'},
+  {t:'19:00',n:'Eerste koude avond',sky:'red',load:1,wind:.15,zon:0,gas:1.8,ev:'De eerste koude avond van het jaar: overal gaat de verwarming aan.'},
+  {t:'23:00',n:'Nieuwe storm',sky:'storm',load:.5,wind:.95,zon:0,gas:1.5,ev:'Het volgende stormfront komt binnen.'}]}};
+let SEASON='standaard',SCEN=SEASONS.standaard.scen;
+function useSeason(k){SEASON=SEASONS[k]?k:'standaard';SCEN=SEASONS[SEASON].scen;}
+
 /* hints: tactiek per rol per ronde (index = ronde-1) */
 const HINTS={
  kern:['Weinig vraag en veel wind: de prijs kan laag uitvallen. Onder 150 MW betaal je €3.000. Wat is erger: een uur verkopen onder je kostprijs, of die boete?',
@@ -197,12 +234,13 @@ const HINTS={
   'Duur gas. Hoeveel moet je nog laden? Elke MWh tekort kost straks €400.',
   'Laatste ronde: wat je nu niet laadt, kost €400/MWh boete. Bied genoeg om zeker te laden.']};
 const CAP=4000,FLOOR=-500,TARIEF=140,MINRUN=150,BATMAX=200,EVNEED=450,EVPEN=400;
-const mc=(r,s)=>r==='kern'?12:r==='gas'?Math.round(85*s.gas):r==='piek'?Math.round(150*s.gas):0;
+const mc=(r,s)=>r==='kern'?12:r==='gas'?Math.round(85*s.gas):r==='piek'?Math.round(150*s.gas):(r==='wind'||r==='zon')?-(s.sub||0):0;
 const demandOf=(st,s)=>Math.round((st.params?.L||0)*s.load);
 function maxQ(pl,s,st,m){const r=pl.role;
  if(r==='wind')return Math.round(250*s.wind);if(r==='zon')return Math.round(200*s.zon);
  if(r==='bat')return m==='laden'?Math.max(0,Math.min(100,Math.floor((BATMAX-pl.soc)/.9))):Math.max(0,Math.min(100,Math.floor(pl.soc)));
  if(r==='lev')return Math.round(demandOf(st,s)*1.5);
+ if(r==='kern')return Math.round(300*(s.kern??s.therm??1));if(r==='gas'||r==='piek')return Math.round(ROLES[r].cap*(s.therm??1));
  return ROLES[r].cap;}
 function defBid(pl,s,st){const r=pl.role;
  if(r==='bat'){const m=s.zon>.6||s.load<.6?'laden':'ontladen';return{m,q:maxQ(pl,s,st,m),p:m==='laden'?30:120};}
@@ -210,7 +248,7 @@ function defBid(pl,s,st){const r=pl.role;
  return{q:maxQ(pl,s,st),p:mc(r,s)};}
 function botBid(pl,s,st){const r=pl.role,j=()=>.9+Math.random()*.35;
  if(r==='kern')return{q:300,p:Math.random()<.5?-20:12};
- if(r==='wind'||r==='zon')return{q:maxQ(pl,s,st),p:Math.round(Math.random()*5)};
+ if(r==='wind'||r==='zon')return{q:maxQ(pl,s,st),p:mc(r,s)+Math.round(Math.random()*5)};
  if(r==='gas'||r==='piek')return{q:maxQ(pl,s,st),p:Math.round(mc(r,s)*j())};
  if(r==='bat'){if(s.zon>.6||s.load<.6)return{m:'laden',q:maxQ(pl,s,st,'laden'),p:40};if(s.load>=.85)return{m:'ontladen',q:maxQ(pl,s,st,'ontladen'),p:140};return null;}
  if(r==='lev')return{q:demandOf(st,s),p:600};
@@ -256,9 +294,9 @@ let fdb=null,G=null,uid=null,code='',teacher=false,state=null,loaded=false,playe
 const now=()=>Date.now()+offset;
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const ALPH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function save(ns){state=ns;schedule();const clean=JSON.parse(JSON.stringify(ns));saving=saving.then(()=>G.child('state').set(clean)).catch(e=>toast('Opslaan mislukt: '+(e?.code||e?.message||'fout')));}
-function freshState(){return{phase:'lobby',round:0,params:{L:0},players:{},result:null,hist:[],deadline:0};}
-function norm(v){if(!v)return null;v.players=v.players||{};for(const p of Object.values(v.players)){if(p.last===undefined)p.last=null;p.soc=p.soc??100;p.chg=p.chg??0;p.tot=p.tot??0;}
+function save(ns){useSeason(ns?.season);state=ns;schedule();const clean=JSON.parse(JSON.stringify(ns));saving=saving.then(()=>G.child('state').set(clean)).catch(e=>toast('Opslaan mislukt: '+(e?.code||e?.message||'fout')));}
+function freshState(){return{season:SEASON,phase:'lobby',round:0,params:{L:0},players:{},result:null,hist:[],deadline:0};}
+function norm(v){if(!v)return null;useSeason(v.season);v.players=v.players||{};for(const p of Object.values(v.players)){if(p.last===undefined)p.last=null;p.soc=p.soc??100;p.chg=p.chg??0;p.tot=p.tot??0;}
  v.hist=Array.isArray(v.hist)?v.hist.slice():Object.keys(v.hist||{}).sort((a,b)=>a-b).map(k=>v.hist[k]);v.params=v.params||{L:0};v.deadline=v.deadline||0;
  if(v.result){v.result.sup=v.result.sup||[];v.result.dem=v.result.dem||[];}return v;}
 const hv=v=>v==='none'||v==null?null:v;
@@ -282,7 +320,7 @@ function closeMarket(){const st=clone(state),s=SCEN[st.round-1],sup=[],dem=[],bi
   else if(r==='lev'){const D=demandOf(st,s),sh=Math.max(0,D-q),imb=Math.max(300,2*P);pr=D*TARIEF-q*P-sh*imb;pl.cost=Math.round((pl.cost||0)+q*P+sh*imb);if(sh>0)note='Tekort '+num(sh)+' MW tegen onbalansprijs '+eur(imb)+'/MWh';}
   else if(r==='ind')pr=q*(120-P);
   else if(r==='ev'){pr=q*(250-P);pl.chg+=q;note='Vandaag geladen: '+num(pl.chg)+' van '+EVNEED+' MWh';}
-  else{pr=q*(P-mc(r,s));if(r==='kern'&&q<MINRUN){pr-=3000;note='Onder de minimumlast: €3.000 extra kosten';}}
+  else{pr=q*(P-mc(r,s));if(r==='kern'&&q<MINRUN&&maxQ(pl,s,st)>=MINRUN){pr-=3000;note='Onder de minimumlast: €3.000 extra kosten';}}
   const bid=b?(r==='bat'?{q:b.q,p:b.p,m:b.m}:{q:b.q,p:b.p}):null;
   pl.tot=Math.round(pl.tot+pr);pl.last={r:st.round,q,pr:Math.round(pr),bid,note};}
  st.result={round:st.round,P:R.P,V:R.V,sup:sup.map(b=>[b.r,b.q,b.p,R.acc[b.k]||0]),dem:dem.map(b=>[b.r,b.q,b.p,R.acc[b.k]||0])};
@@ -293,7 +331,7 @@ function nextRound(){const st=clone(state);
 /* verdienpotentieel: wat je met perfecte kennis van de prijzen achteraf had kunnen verdienen (als prijsnemer) */
 function potentialOf(pl,st){const r=pl.role,Ps=(st.hist||[]).map(hv),rounds=SCEN.map((s,i)=>({s,P:Ps[i]})).filter(x=>x.P!=null);let pot=0;
  if(r==='wind'||r==='zon'||r==='gas'||r==='piek')for(const{s,P}of rounds)pot+=Math.max(0,P-mc(r,s))*maxQ(pl,s,st);
- else if(r==='kern')for(const{P}of rounds)pot+=Math.max(300*(P-12),MINRUN*(P-12),MINRUN*(P-12)-3000,-3000);
+ else if(r==='kern')for(const{s,P}of rounds){const cap=maxQ(pl,s,st);pot+=cap<MINRUN?0:Math.max(cap*(P-12),MINRUN*(P-12),-3000);}
  else if(r==='ind')for(const{P}of rounds)pot+=Math.max(0,120-P)*250;
  else if(r==='ev'){let tot=0;for(const P of rounds.map(x=>x.P).sort((a,b)=>a-b)){let q=0;if(250-P>0)q=150;else if(tot<EVNEED&&650-P>0)q=Math.min(150,EVNEED-tot);pot+=q*(250-P);tot+=q;}pot-=Math.max(0,EVNEED-tot)*EVPEN;}
  else if(r==='bat'){let V=new Map([[100,0]]);for(const{P}of rounds){const N=new Map();for(const[soc,v]of V)for(let q=0;q<=100;q+=10){
@@ -318,24 +356,68 @@ function watchMyBid(){if(teacher||!state||state.round===myBidRound)return;if(myB
  if(!state.round)return;myBidRef=G.child('bids/'+state.round+'/'+uid);
  myBidRef.on('value',s=>{const v=s.val();const pl=state?.players?.[uid];if(v&&pl){draftKey=state.round+'|'+pl.role;draft={m:v.m||'ontladen',q:v.q,p:v.p};submittedFor=draftKey;lastSig='';schedule();}},()=>{});}
 
+/* hints voor seizoensdagen, afgeleid uit het scenario */
+function autoHint(pl,s,i){const r=pl.role,n=SCEN.length,last=i===n-1,sub=s.sub||0,kern=s.kern??s.therm??1,therm=s.therm??1,c=mc(r,s),pk=mc('piek',s),
+ surplus=(s.load<=.5&&(s.wind>=.6||s.zon>=.8))||(sub&&s.load<=.5),tight=(s.load>=.9&&s.wind<=.3)||(kern===0&&s.load>=.85),gasUp=s.gas>1.05;
+ if(r==='kern'){if(kern===0)return'Je centrale staat stil door de storing: je kunt deze ronde niets verkopen. Kijk wat het met de prijs doet.';
+  if(kern<1)return`Door het warme koelwater mag je maar ${Math.round(kern*100)}% leveren. Minder aanbod in de markt betekent vaak een hogere prijs.`;
+  if(surplus)return'Overschot verwacht: de prijs kan onder nul zakken. Onder 150 MW betaal je €3.000. Een negatief bod op je minimumlast kan goedkoper zijn dan afschakelen.';
+  if(tight)return'Krap uur: je wordt zeker afgenomen. Je krijgt de marktprijs, dus laag bieden kost je niets.';
+  if(gasUp)return'Duur gas betekent dat gascentrales een hoge prijs zetten. Jouw kosten blijven €12: verkoop alles.';
+  return'Bied je volle vermogen rond je kosten. Pay-as-clear: je krijgt de marktprijs, niet je bod.';}
+ if(r==='wind'||r==='zon'){const f=r==='wind'?s.wind:s.zon;if(f<.02)return r==='zon'?'Geen zon: je hebt deze ronde geen vermogen.':'Windstil: je hebt deze ronde geen vermogen.';
+  if(sub)return`Je krijgt €${sub}/MWh subsidie bovenop de marktprijs. Zelfs bij een prijs van −€${sub-5} verdien je nog. Hoe laag durf je te bieden, als de anderen hetzelfde denken?`;
+  if(surplus)return'Veel gratis stroom op de markt: de prijs kan naar nul of lager zakken. Bepaal je ondergrens.';
+  if(f<.35)return'Weinig productie, maar wat je hebt, krijgt de marktprijs. Bied laag, dan draai je zeker.';
+  return'Je marginale kosten zijn nul en wat je niet verkoopt, is verloren. Bied laag en verkoop alles.';}
+ if(r==='gas'){const cut=therm<1?` Je mag maar ${Math.round(therm*100)}% leveren door warm koelwater.`:'';
+  if(tight)return`Krap uur: je bent waarschijnlijk nodig. Je ruimte ligt tussen je eigen kosten (€${c}) en die van de piekcentrale (€${pk}).${cut}`;
+  if(surplus)return`Overschot: je bent waarschijnlijk niet nodig. Bied niet onder je kosten van €${c}.`;
+  if(gasUp)return`Door de dure gasprijs zijn je kosten €${c}/MWh. Pas je bod aan, anders verkoop je met verlies.${cut}`;
+  return`Bied rond je kosten (€${c}/MWh). Stijgt de vraag, dan bepaal jij vaak de prijs.${cut}`;}
+ if(r==='piek'){if(tight||(therm<1&&s.load>=.9))return'Dit kan jouw uur zijn: is er zonder jou te weinig aanbod, dan bepaal jij de prijs. Hoe hoog durf je te gaan voordat afnemers afhaken?';
+  if(surplus)return'Overschot: geen kans. Bied je kosten of sla over.';
+  return`Je bent alleen nodig als het krap wordt. Bied minimaal je kosten (€${c}).`;}
+ if(r==='bat'){if(last)return'Laatste ronde: lading die overblijft, levert niets op. Verkoop wat je nog hebt.';
+  if(surplus)return'Overschot verwacht: laad nu. Misschien word je zelfs betaald om stroom af te nemen.';
+  if(tight)return'Krapste moment: ontlaad, met een hoge minimumprijs.';
+  if(s.load>=.8)return'Hoge vraag: een goed moment om te ontladen.';
+  return'Gemiddeld uur. Laad als je verwacht dat het later duurder wordt; ontlaad als je nu een goede prijs verwacht.';}
+ if(r==='lev'){if(surplus)return'Lage prijs verwacht: koop precies je vraag in. Bij een negatieve prijs word je betaald om in te kopen.';
+  if(tight)return'Krap uur: bied je te laag, dan krijg je niets en betaal je onbalans. Bied ruim.';
+  return'Dek je hele vraag met een ruime maximumprijs: je betaalt de marktprijs, niet je bod.';}
+ if(r==='ind'){if(surplus)return'Goedkope stroom verwacht, misschien zelfs negatief geprijsd. Draai vol.';
+  if(tight||(gasUp&&s.load>=.85))return'De prijs komt waarschijnlijk boven €120. Stilstaan kan beter zijn dan verlies maken.';
+  return'Koop zolang de prijs onder je waarde van €120 blijft.';}
+ const need=Math.max(0,EVNEED-(pl.chg||0)),left=n-i;
+ if(need<=0)return'Je hebt al genoeg geladen. Laad alleen nog als de prijs ruim onder €250 ligt.';
+ if(last)return`Laatste ronde: je mist nog ${num(need)} MWh, en elke MWh kost straks €400. Bied genoeg om zeker te laden.`;
+ if(need>=left*150-1)return`Je moet elke resterende ronde vol laden om je ${num(need)} MWh te halen. Bied ruim.`;
+ if(surplus)return'Goedkoop uur: laad vol.';
+ if(tight)return`Duur uur. Je mist nog ${num(need)} MWh in ${left} rondes: kun je dit uur overslaan?`;
+ return`Je mist nog ${num(need)} MWh in ${left} rondes. Plan je laden in de goedkoopste uren.`;}
 /* ---------- live scene (canvas) ---------- */
-const SKY=[
- {top:'#03050f',bot:'#16204a',hill:'#070a18',stars:1,sun:0,sx:.8,sy:.2,sunc:'#ffffff',moon:1,clouds:.25,rain:0,storm:0,night:1},
- {top:'#24164a',bot:'#ff8d5e',hill:'#1a1230',stars:.15,sun:.9,sx:.82,sy:.62,sunc:'#ffb36b',moon:0,clouds:.4,rain:0,storm:0,night:.45},
- {top:'#0f5fc4',bot:'#8fd3ff',hill:'#123448',stars:0,sun:1,sx:.7,sy:.18,sunc:'#fff4c2',moon:0,clouds:.3,rain:0,storm:0,night:0},
- {top:'#140a26',bot:'#ff4e3a',hill:'#120a1c',stars:.2,sun:.55,sx:.86,sy:.74,sunc:'#ff7a45',moon:0,clouds:.15,rain:0,storm:0,night:.85},
- {top:'#0d0614',bot:'#6a1430',hill:'#0b0610',stars:.45,sun:0,sx:.85,sy:.8,sunc:'#ff5b4f',moon:.4,clouds:.35,rain:0,storm:0,night:1},
- {top:'#05070c',bot:'#263246',hill:'#05070b',stars:0,sun:0,sx:.8,sy:.2,sunc:'#ffffff',moon:0,clouds:1,rain:1,storm:1,night:1}];
+const SKY={
+ night:{top:'#03050f',bot:'#16204a',hill:'#070a18',stars:1,sun:0,sx:.8,sy:.2,sunc:'#ffffff',moon:1,clouds:.25,rain:0,storm:0,night:1},
+ dawn:{top:'#24164a',bot:'#ff8d5e',hill:'#1a1230',stars:.15,sun:.9,sx:.82,sy:.62,sunc:'#ffb36b',moon:0,clouds:.4,rain:0,storm:0,night:.45},
+ noon:{top:'#0f5fc4',bot:'#8fd3ff',hill:'#123448',stars:0,sun:1,sx:.7,sy:.18,sunc:'#fff4c2',moon:0,clouds:.3,rain:0,storm:0,night:0},
+ dusk:{top:'#140a26',bot:'#ff4e3a',hill:'#120a1c',stars:.2,sun:.55,sx:.86,sy:.74,sunc:'#ff7a45',moon:0,clouds:.15,rain:0,storm:0,night:.85},
+ red:{top:'#0d0614',bot:'#6a1430',hill:'#0b0610',stars:.45,sun:0,sx:.85,sy:.8,sunc:'#ff5b4f',moon:.4,clouds:.35,rain:0,storm:0,night:1},
+ storm:{top:'#05070c',bot:'#263246',hill:'#05070b',stars:0,sun:0,sx:.8,sy:.2,sunc:'#ffffff',moon:0,clouds:1,rain:1,storm:1,night:1},
+ grey:{top:'#3d4656',bot:'#9aa6b8',hill:'#1c222d',stars:0,sun:.12,sx:.6,sy:.25,sunc:'#f2f4f8',moon:0,clouds:1,rain:.25,storm:0,night:.25},
+ heat:{top:'#2f86e0',bot:'#ffe2a6',hill:'#3b3424',stars:0,sun:1,sx:.66,sy:.16,sunc:'#fff6d8',moon:0,clouds:.05,rain:0,storm:0,night:0}};
+const FX=['snow','blossom','leaves','heat'];
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const hex2=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const mixc=(a,b,t)=>{const A=hex2(a),B=hex2(b);return'#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('');};
 const lerp=(a,b,t)=>a+(b-a)*t;
-function sceneOf(i){const s=SCEN[i],k=SKY[i];return{...k,wind:s.wind,zon:s.zon,load:s.load,gas:s.gas};}
+function sceneOf(i){const s=SCEN[i]||SCEN[0],k=SKY[s.sky]||SKY.night,fx=SEASONS[SEASON].fx,o={...k,wind:s.wind,zon:s.zon,load:s.load,gas:s.gas};for(const f of FX)o[f]=f==='heat'?(fx.heat||0)*(s.zon>.5||(s.therm??1)<1?1:.3):(fx[f]||0);return o;}
 const SC={idx:-2,from:null,to:null,t0:0,dur:1600,rot:0,last:0,show:false,showT:0,party:false,bolt:0,nextBolt:0,
  stars:Array.from({length:90},()=>({x:Math.random(),y:Math.random()*.55,r:Math.random()*1.4+.3,p:Math.random()*6})),
  rain:Array.from({length:140},()=>({x:Math.random(),y:Math.random(),l:Math.random()*14+10})),
  clouds:Array.from({length:7},(_,i)=>({x:Math.random(),y:.08+Math.random()*.28,s:.6+Math.random()*.8,v:.4+Math.random()})),
  bld:(()=>{const a=[];let x=.8;while(x<1.02){const w=.018+Math.random()*.03;a.push({x,w,h:.12+Math.random()*.22,win:Array.from({length:14},()=>Math.random())});x+=w+.004;}return a;})(),
+ fx:Array.from({length:110},()=>({x:Math.random(),y:Math.random(),v:.4+Math.random(),r:Math.random()*6,ph:Math.random()*6,c:Math.floor(Math.random()*3)})),
  conf:Array.from({length:130},()=>({x:Math.random(),y:-Math.random(),v:.08+Math.random()*.12,r:Math.random()*6,c:Object.values(ROLES)[Math.floor(Math.random()*9)].col}))};
 function setScene(i,opt={}){SC.show=!!opt.show;SC.party=!!opt.party;if(SC.show&&SC.idx>=0)return;const tgt=Math.max(0,i);if(tgt===SC.idx)return;
  SC.from=SC.to?curScene():sceneOf(tgt);SC.to=sceneOf(tgt);SC.idx=tgt;SC.t0=performance.now();SC.showT=SC.t0;}
@@ -352,7 +434,7 @@ function drawScene(now){const cv=$('#sky');if(!cv||!SC.to)return;const r=cv.getB
  if(P.clouds>.02){const cc=mixc('#ffffff','#2a3142',P.storm*.85);for(const k of SC.clouds){k.x=(k.x+dt*.004*k.v*(1+P.wind*5))%1.3;const x=(k.x-.15)*W,y=k.y*H,s=k.s*Math.min(W,H)*.09;c.globalAlpha=P.clouds*(.18+P.storm*.6);c.fillStyle=cc;
   c.beginPath();c.ellipse(x,y,s*1.6,s*.55,0,0,7);c.ellipse(x+s*.9,y-s*.25,s,s*.6,0,0,7);c.ellipse(x-s*.8,y-s*.1,s*.9,s*.5,0,0,7);c.fill();}c.globalAlpha=1;}
  // far hills
- const hy=H*.66;c.fillStyle=P.hill;c.beginPath();c.moveTo(0,H);for(let x=0;x<=W;x+=W/40)c.lineTo(x,hy-Math.sin(x/W*5+1)*H*.05-Math.sin(x/W*13)*H*.015);c.lineTo(W,H);c.fill();
+ const hy=H*.66;c.fillStyle=P.snow>.02?mixc(P.hill,'#c8d2e2',P.snow*.55):P.hill;c.beginPath();c.moveTo(0,H);for(let x=0;x<=W;x+=W/40)c.lineTo(x,hy-Math.sin(x/W*5+1)*H*.05-Math.sin(x/W*13)*H*.015);c.lineTo(W,H);c.fill();
  // city
  for(const b of SC.bld){const x=b.x*W,w=b.w*W,h=b.h*H,y=hy+H*.05-h;c.fillStyle='#05060c';c.fillRect(x,y,w,h+H);const lit=P.night*(.25+.75*P.load);
   for(let i=0;i<b.win.length;i++){const cx=x+3+(i%2)*(w/2),cy=y+6+Math.floor(i/2)*(h/8);if(cy>y+h-4)break;if(b.win[i]<lit){c.fillStyle=b.win[i]>lit-.02&&Math.sin(t*3+i)>.9?'#ffb04a':'#ffd98a';c.globalAlpha=.85;c.fillRect(cx,cy,Math.max(2,w/2-6),3);}}c.globalAlpha=1;}
@@ -374,13 +456,17 @@ function drawScene(now){const cv=$('#sky');if(!cv||!SC.to)return;const r=cv.getB
   c.beginPath();c.moveTo(x,sy);c.lineTo(x+w,sy);c.lineTo(x+w*1.25,sy-H*.05);c.lineTo(x+w*.25,sy-H*.05);c.closePath();c.fill();}
  if(P.rain>.02){c.strokeStyle='rgba(170,195,235,.45)';c.lineWidth=1;c.globalAlpha=P.rain;c.beginPath();for(const d of SC.rain){d.y=(d.y+dt*1.4)%1.1;const x=d.x*W,y=d.y*H;c.moveTo(x,y);c.lineTo(x-d.l*.35,y+d.l);}c.stroke();c.globalAlpha=1;}
  if(P.storm>.5&&!RM){if(now>SC.nextBolt){SC.bolt=now;SC.nextBolt=now+4500+Math.random()*4000;SC.bx=.2+Math.random()*.6;}const a=1-(now-SC.bolt)/350;if(a>0){c.fillStyle=`rgba(210,220,255,${a*.22})`;c.fillRect(0,0,W,H);c.strokeStyle=`rgba(240,245,255,${a})`;c.lineWidth=2;c.beginPath();let x=SC.bx*W,y=0;c.moveTo(x,y);while(y<hy-20){x+=(Math.sin(y*.37+SC.bolt)*18);y+=H*.06;c.lineTo(x,y);}c.stroke();}}
+ if(P.heat>.02){for(let i=0;i<5;i++){c.globalAlpha=P.heat*.06;c.fillStyle='#fff3c4';c.beginPath();const yb=hy-H*.02-i*H*.025;c.moveTo(0,yb);for(let x=0;x<=W;x+=W/30)c.lineTo(x,yb+Math.sin(x*.03+t*2+i)*3);c.lineTo(W,yb+10);c.lineTo(0,yb+10);c.fill();}c.globalAlpha=1;}
+ for(const f of ['snow','blossom','leaves']){const a=P[f];if(a<.02)continue;const cols=f==='snow'?['#ffffff','#e6eeff']:f==='blossom'?['#ffb7d5','#ffd6e6','#fff0f5']:['#e0782a','#c9561e','#e8a33a'];
+  c.globalAlpha=a*.9;for(const p of SC.fx){p.y+=dt*(f==='snow'?.05:.07)*p.v;p.x+=dt*(f==='snow'?.004:.02+P.wind*.03)*(.5+p.v);if(p.y>1.05){p.y=-.05;p.x=Math.random();}if(p.x>1.05)p.x=-.05;p.r+=dt*(f==='snow'?0:2.5);
+   const x=(p.x+Math.sin(t*.8+p.ph)*.01)*W,y=p.y*H;c.fillStyle=cols[p.c%cols.length];c.save();c.translate(x,y);c.rotate(p.r);if(f==='snow'){c.beginPath();c.arc(0,0,1+p.v*1.6,0,7);c.fill();}else c.fillRect(-4,-2,8,4);c.restore();}c.globalAlpha=1;}
  if(SC.party&&!RM)for(const p of SC.conf){p.y+=dt*p.v;if(p.y>1.05){p.y=-.05;p.x=Math.random();}p.r+=dt*4;c.save();c.translate(p.x*W+Math.sin(t+p.r)*12,p.y*H);c.rotate(p.r);c.fillStyle=p.c;c.fillRect(-4,-2,8,4);c.restore();}
  if(SC.show&&now-SC.showT>6500){SC.showT=now;const nx=(SC.idx+1)%SCEN.length;SC.from=curScene();SC.to=sceneOf(nx);SC.idx=nx;SC.t0=now;}}
 function loop(now){if(!document.hidden)drawScene(now);if(!RM)requestAnimationFrame(loop);}
 if(RM)setInterval(()=>drawScene(performance.now()),2000);else requestAnimationFrame(loop);
 const BOLT='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l11-13h-6.8z" fill="#d4ff3a"/></svg>';
 let heroLast='';function setHero(html){if(html!==heroLast){heroLast=html;$('#heroIn').innerHTML=html;}}
-function chips(s){return`<div class="chips"><span>Vraag <b>${Math.round(s.load*100)}%</b></span><span>Wind <b>${Math.round(s.wind*100)}%</b></span><span>Zon <b>${Math.round(s.zon*100)}%</b></span><span>Gas <b>${s.gas>1?'+60%':'normaal'}</b></span></div>`;}
+function chips(s){const k=s.kern??s.therm??1;return`<div class="chips"><span>Vraag <b>${Math.round(s.load*100)}%</b></span><span>Wind <b>${Math.round(s.wind*100)}%</b></span><span>Zon <b>${Math.round(s.zon*100)}%</b></span><span>Gas <b>${s.gas>1.001?'+'+Math.round((s.gas-1)*100)+'%':'normaal'}</b></span>${k<1?`<span>Kern <b>${Math.round(k*100)}%</b></span>`:''}${(s.therm??1)<1?`<span>Gas- en piekcentrales <b>${Math.round(s.therm*100)}%</b></span>`:''}${s.sub?`<span>Subsidie wind/zon <b>€${s.sub}</b></span>`:''}</div>`;}
 function countUp(el,to){if(!el)return;if(RM||to==null){el.textContent=to==null?'—':eur(to);return;}const t0=performance.now(),from=0;
  const st=n=>{const k=Math.min(1,(n-t0)/900),e=1-(1-k)**3;el.textContent=eur(from+(to-from)*e);if(k<1)requestAnimationFrame(st);};requestAnimationFrame(st);}
 let lastCount=-1,lastMO=-1;
@@ -409,17 +495,18 @@ function renderTeacher(){const app=$('#app');if(!loaded){return;}
  const hintBtn=ph!=='end'?`<button class="ghost" data-a="hints" aria-pressed="${state.hints!==false}">Hints ${state.hints!==false?'aan':'uit'}</button>`:'';
  const reset=`<button class="ghost" data-a="reset">${confirmReset?'Zeker weten? Klik nogmaals':'Nieuw spel'}</button>`;
  document.body.dataset.view='teacher';setScene(ph==='bid'||ph==='res'?state.round-1:0,{show:ph==='lobby'||ph==='end',party:ph==='end'});
- let hm;if(ph==='lobby')hm=`<div><p class="eyebrow">DAY-AHEAD MARKT · PAY-AS-CLEAR</p><h1 class="clock" style="font-size:clamp(40px,6.5vw,88px)">Handelsdag</h1><p class="scen">${np} ${np===1?'speler':'spelers'} · spelcode ${esc(code)}</p></div>`;
+ let hm;if(ph==='lobby')hm=`<div><p class="eyebrow">DAY-AHEAD MARKT · PAY-AS-CLEAR</p><h1 class="clock" style="font-size:clamp(40px,6.5vw,88px)">${SEASON==='standaard'?'Handelsdag':esc(SEASONS[SEASON].n+'dag')}</h1><p class="scen">${np} ${np===1?'speler':'spelers'} · spelcode ${esc(code)}</p></div>`;
  else if(ph==='end'){const w=byPct()[0];hm=`<div><p class="eyebrow">EINDE HANDELSDAG · WINNAAR</p><h1 class="clock" style="font-size:clamp(40px,6.5vw,88px)">${w?esc(w[1].name):'—'}</h1><p class="scen">${w&&w[1].pct!=null?pctTxt(w[1].pct)+' van het verdienpotentieel':''}</p></div>`;}
- else hm=`<div><p class="eyebrow">RONDE ${state.round} VAN ${SCEN.length} · SPELCODE ${esc(code)}</p><div class="clock">${s.t}</div><p class="scen">${esc(s.n)}</p><p class="ev">${esc(s.ev)}</p>${chips(s)}</div><div class="timer" id="timer"></div>`;
+ else hm=`<div><p class="eyebrow">${SEASON==='standaard'?'':esc(SEASONS[SEASON].n.toUpperCase())+' · '}RONDE ${state.round} VAN ${SCEN.length} · SPELCODE ${esc(code)}</p><div class="clock">${s.t}</div><p class="scen">${esc(s.n)}</p><p class="ev">${esc(s.ev)}</p>${chips(s)}</div><div class="timer" id="timer"></div>`;
  setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div><div class="row">${btn}${hintBtn}${reset}</div></div><div class="hero-main">${hm}</div>`);
  const head='';
  let body='';
  if(ph==='lobby'){
   body=`<div class="grid"><div class="card stack-v"><h2>Spelers en rollen</h2><p class="mute small">Studenten scannen de QR-code, of gaan naar de link en vullen code ${esc(code)} in. Daarna kiezen ze een naam. Ze krijgen automatisch een rol in een vaste volgorde, zodat vraag en aanbod in balans blijven. Tik op een rol om die te wijzigen.</p>
    <div class="players">${Object.entries(state.players).map(([k,p])=>`<div class="pl"><i class="dot" style="background:${p.bot||presenceOf(k)?.on?'var(--ok)':'var(--line)'}"></i><div style="flex:1"><b>${esc(p.name)}</b><button class="rolebtn" data-role="${esc(k)}"><i class="dot" style="background:${ROLES[p.role].col}"></i> ${ROLES[p.role].n}</button></div><button class="x" data-del="${esc(k)}" aria-label="Verwijder">×</button></div>`).join('')||'<p class="mute">Nog niemand binnen. Laat studenten de QR-code scannen.</p>'}</div>
+   <div class="stack-v"><h3>Speldag</h3><div class="seasons">${Object.entries(SEASONS).map(([k,v])=>`<button class="season ${SEASON===k?'on':''}" data-season="${k}" aria-pressed="${SEASON===k}"><b>${v.n}</b><span>${v.d}</span></button>`).join('')}</div></div>
    <div class="row"><button class="ghost" data-a="bots" ${missingRoles().length?'':'disabled'}>Aanvullen met bots${missingRoles().length?' ('+missingRoles().length+')':''}</button><span class="mute small">${missingRoles().length?'Voegt alleen bots toe voor rollen zonder speler.':'Alle rollen zijn bezet.'}</span></div></div>
-   <div class="stack-v"><div class="card stack-v" style="text-align:center"><p class="eyebrow" style="margin:0">SCAN OM MEE TE DOEN</p><div class="qrbox" id="qr"></div><div class="code">${esc(code)}</div><p class="small" style="overflow-wrap:anywhere">${esc(joinUrl())}</p></div><div class="card stack-v"><h2>Zo werkt het</h2><p>Elke ronde is één uur van de dag. Producenten bieden volume en een minimumprijs, afnemers volume en een maximumprijs. De markt sorteert alle biedingen in de merit order en de duurste nog benodigde eenheid bepaalt de prijs voor iedereen.</p><p class="mute small">Zes rondes: nacht, ochtendpiek, zonnige middag, windstille avond, gasprijsschok en stormnacht.</p></div>
+   <div class="stack-v"><div class="card stack-v" style="text-align:center"><p class="eyebrow" style="margin:0">SCAN OM MEE TE DOEN</p><div class="qrbox" id="qr"></div><div class="code">${esc(code)}</div><p class="small" style="overflow-wrap:anywhere">${esc(joinUrl())}</p></div><div class="card stack-v"><h2>Zo werkt het</h2><p>Elke ronde is één uur van de dag. Producenten bieden volume en een minimumprijs, afnemers volume en een maximumprijs. De markt sorteert alle biedingen in de merit order en de duurste nog benodigde eenheid bepaalt de prijs voor iedereen.</p><p class="mute small">Zes rondes: ${SCEN.map(x=>x.t+' '+x.n.toLowerCase()).join(', ')}.</p></div>
    <div class="card"><h3>Rollen</h3><div class="legend">${ORDER.map(r=>`<span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span>`).join('')}</div></div></div></div>`;
  }else if(ph==='end'){
   body=`<div class="grid"><div class="card stack-v"><h2>Eindstand: % van verdienpotentieel</h2><p class="mute small">Verdienpotentieel = wat je met jouw installatie had kunnen verdienen als je alle prijzen van vandaag vooraf had gekend. Boven 100%: je hebt de prijs in je voordeel beïnvloed. Leveranciers worden gescoord op inkoopkosten (ideaal ÷ werkelijk).</p>
@@ -500,7 +587,7 @@ function facts(pl,s){const r=pl.role,f=[];
 function bidForm(pl,s){const k=state.round+'|'+pl.role;if(draftKey!==k){draft=defBid(pl,s,state);draftKey=k;}
  const sell=pl.role==='bat'?draft.m==='ontladen':ROLES[pl.role].side==='s';const mx=maxQ(pl,s,state,draft.m);if(draft.q>mx)draft.q=mx;
  const prev=state.result?`<p class="mute small">Vorige ronde (${SCEN[state.result.round-1].t}): ${state.result.P==null?'geen handel':eur(state.result.P)+'/MWh'}</p>`:'';
- return`<div class="card stack-v"><p class="event">${esc(s.ev)}</p>${prev}<div>${facts(pl,s)}</div>${state.hints!==false&&HINTS[pl.role]?`<details class="hint"><summary>Hint: tactiek voor deze ronde</summary><p>${HINTS[pl.role][state.round-1]||''}</p></details>`:''}</div>
+ return`<div class="card stack-v"><p class="event">${esc(s.ev)}</p>${prev}<div>${facts(pl,s)}</div>${state.hints!==false&&HINTS[pl.role]?`<details class="hint"><summary>Hint: tactiek voor deze ronde</summary><p>${SEASON==='standaard'?HINTS[pl.role][state.round-1]||'':autoHint(pl,s,state.round-1)}</p></details>`:''}</div>
  <form class="card stack-v" id="bid">
   ${pl.role==='bat'?`<div class="seg"><button type="button" data-m="laden" class="${draft.m==='laden'?'on':''}">Laden (kopen)</button><button type="button" data-m="ontladen" class="${draft.m==='ontladen'?'on':''}">Ontladen (verkopen)</button></div>`:''}
   <div><label for="q">${sell?'Hoeveel wil je verkopen?':'Hoeveel wil je kopen?'} <span class="mute">(max ${num(mx)} MW)</span></label>
@@ -532,8 +619,8 @@ function resultCard(pl,end){const L=pl.last,res=state.result;
 document.addEventListener('click',e=>{if(!teacher)return;const t=e.target.closest('button');if(!t||!state)return;const a=t.dataset.a;
  if(a!=='reset')confirmReset=false;
  if(a==='start')startGame();else if(a==='close')closeMarket();else if(a==='next')nextRound();
- else if(a==='t60')setTimer(60);else if(a==='t90')setTimer(90);else if(a==='bots')addBots();else if(a==='hints'){const st=clone(state);st.hints=state.hints===false;save(st);}
- else if(a==='reset'){if(confirmReset){confirmReset=false;G.child('bids').remove().catch(()=>{});const st=freshState();for(const[k,p]of Object.entries(state.players))if(!p.bot)st.players[k]={name:p.name,role:p.role,tot:0,soc:100,chg:0,last:null};save(st);}else{confirmReset=true;render();}}
+ else if(a==='t60')setTimer(60);else if(a==='t90')setTimer(90);else if(a==='bots')addBots();else if(t.dataset.season&&state.phase==='lobby'){const st=clone(state);st.season=t.dataset.season;SC.idx=-2;save(st);}else if(a==='hints'){const st=clone(state);st.hints=state.hints===false;save(st);}
+ else if(a==='reset'){if(confirmReset){confirmReset=false;G.child('bids').remove().catch(()=>{});const st=freshState();st.season=state.season||'standaard';for(const[k,p]of Object.entries(state.players))if(!p.bot)st.players[k]={name:p.name,role:p.role,tot:0,soc:100,chg:0,last:null};save(st);}else{confirmReset=true;render();}}
  else if(t.dataset.role){const st=clone(state),p=st.players[t.dataset.role];if(p){p.role=ORDER[(ORDER.indexOf(p.role)+1)%ORDER.length];save(st);}}
  else if(t.dataset.del){const k=t.dataset.del,st=clone(state);delete st.players[k];if(!k.startsWith('bot-'))G.child('players/'+k).remove().catch(()=>{});save(st);}});
 
