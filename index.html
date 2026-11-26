@@ -141,38 +141,38 @@ const ORDER=['lev','gas','wind','ind','kern','zon','bat','ev','piek'];
 const SEASONS={
  standaard:{n:'Standaard',d:'Klassieke dag: van nacht tot stormnacht',fx:{},scen:[
   {t:'03:00',n:'Nacht',sky:'night',load:.42,wind:.75,zon:0,gas:1,ev:'Rustige nacht met behoorlijk wat wind.'},
-  {t:'08:00',n:'Ochtendpiek',sky:'dawn',load:.85,wind:.45,zon:.25,gas:1,ev:'Iedereen staat op; de zon komt langzaam op.'},
+  {t:'08:00',n:'Ochtendpiek',sky:'dawn',load:1.02,wind:.45,zon:.25,gas:1,ev:'Iedereen staat op; de zon komt langzaam op.'},
   {t:'13:00',n:'Zonnige middag',sky:'noon',load:.52,wind:.35,zon:1,gas:1,ev:'Volle zon op alle panelen. Zakt de prijs onder nul?'},
-  {t:'18:00',n:'Windstille avondpiek',sky:'dusk',load:1,wind:.08,zon:.05,gas:1,ev:'Bijna geen wind, geen zon en de hoogste vraag van de dag.'},
-  {t:'20:00',n:'Gasprijsschok',sky:'red',load:.9,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
+  {t:'18:00',n:'Windstille avondpiek',sky:'dusk',load:1.2,wind:.08,zon:.05,gas:1,ev:'Bijna geen wind, geen zon en de hoogste vraag van de dag.'},
+  {t:'20:00',n:'Gasprijsschok',sky:'red',load:1.08,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
   {t:'23:00',n:'Stormnacht',sky:'storm',load:.45,wind:1,zon:0,gas:1.6,ev:'Er trekt een storm over: windparken draaien op vol vermogen.'}]},
  winter:{n:'Winter',d:'Krapte: hoge vraag, duur gas, Dunkelflaute en een storing',fx:{snow:1},scen:[
   {t:'03:00',n:'Vriesnacht',sky:'night',load:.6,wind:.5,zon:0,gas:1.4,ev:'Het vriest: warmtepompen draaien ook ’s nachts door. Matige wind.'},
-  {t:'08:00',n:'Koude ochtendpiek',sky:'dawn',load:.95,wind:.35,zon:.05,gas:1.4,ev:'Iedereen zet de verwarming hoger. De zon komt pas om half negen op.'},
+  {t:'08:00',n:'Koude ochtendpiek',sky:'dawn',load:1.14,wind:.35,zon:.05,gas:1.4,ev:'Iedereen zet de verwarming hoger. De zon komt pas om half negen op.'},
   {t:'12:00',n:'Grijze middag',sky:'grey',load:.8,wind:.25,zon:.25,gas:1.4,ev:'Zwaar bewolkt: de zonneparken leveren maar een kwart.'},
-  {t:'17:30',n:'Dunkelflaute',sky:'night',load:1,wind:.03,zon:0,gas:1.4,ev:'Donker, ijskoud en windstil: de hoogste vraag van het jaar.'},
-  {t:'19:00',n:'Storing kerncentrale',sky:'red',load:1,wind:.1,zon:0,gas:1.4,kern:0,ev:'De kerncentrale valt onverwacht uit: 300 MW minder aanbod.'},
+  {t:'17:30',n:'Dunkelflaute',sky:'night',load:1.2,wind:.03,zon:0,gas:1.4,ev:'Donker, ijskoud en windstil: de hoogste vraag van het jaar.'},
+  {t:'19:00',n:'Storing kerncentrale',sky:'red',load:1.2,wind:.1,zon:0,gas:1.4,kern:0,ev:'De kerncentrale valt onverwacht uit: 300 MW minder aanbod.'},
   {t:'23:00',n:'Wind steekt op',sky:'night',load:.7,wind:.8,zon:0,gas:1.4,kern:0,ev:'Een front brengt wind. De kerncentrale is nog niet terug.'}]},
  lente:{n:'Lente',d:'Overschot: wind en zon bij lage vraag op een feestdag',fx:{blossom:1},scen:[
   {t:'04:00',n:'Winderige nacht',sky:'night',load:.4,wind:.85,zon:0,gas:1,ev:'Lage vraag en een stevige westenwind.'},
   {t:'09:00',n:'Hemelvaartsdag',sky:'dawn',load:.5,wind:.7,zon:.5,gas:1,ev:'Feestdag: kantoren en fabrieken zijn dicht, de vraag blijft laag.'},
   {t:'13:00',n:'Zon én wind',sky:'noon',load:.42,wind:.65,zon:1,gas:1,ev:'Volop zon en wind bij een lage vraag: dit wordt een overschot.'},
   {t:'16:00',n:'Buien',sky:'grey',load:.55,wind:.9,zon:.3,gas:1,ev:'Buien trekken over: de zon valt weg, de wind trekt aan.'},
-  {t:'19:00',n:'Lenteavond',sky:'dusk',load:.75,wind:.4,zon:.05,gas:1,ev:'De wind gaat liggen en de zon gaat onder.'},
+  {t:'19:00',n:'Windstille lenteavond',sky:'dusk',load:1.08,wind:.08,zon:.05,gas:1,ev:'De wind valt ineens weg en de zon gaat onder: na een dag overschot wordt het opeens krap.'},
   {t:'23:00',n:'Rustige nacht',sky:'night',load:.45,wind:.35,zon:0,gas:1,ev:'Weinig wind en weinig vraag.'}]},
  zomer:{n:'Zomer',d:'Eendencurve en negatieve prijzen, met een hittegolf',fx:{heat:1},scen:[
   {t:'04:00',n:'Warme nacht',sky:'night',load:.45,wind:.2,zon:0,gas:1,ev:'Een windstille, warme nacht.'},
   {t:'10:00',n:'Zonnige ochtend',sky:'noon',load:.55,wind:.25,zon:.75,gas:1,ev:'De zon klimt snel: zonneparken draaien al op driekwart.'},
   {t:'13:00',n:'Pinksterzondag',sky:'heat',load:.15,wind:1,zon:1,gas:1,sub:60,ev:'Pinksterzondag, onbewolkt en een stevige bries: veel meer aanbod dan vraag. Wind- en zonneparken krijgen €60/MWh subsidie bovenop de marktprijs.'},
   {t:'15:00',n:'Hittegolf',sky:'heat',load:.65,wind:.1,zon:.9,gas:1,therm:.7,sub:60,ev:'Het rivierwater is te warm: gas- en kerncentrales mogen maar 70% leveren. Airco’s draaien vol.'},
-  {t:'21:00',n:'Zonsondergang',sky:'dusk',load:.95,wind:.1,zon:0,gas:1,therm:.7,ev:'De zon is weg, maar de airco’s draaien nog: de eendencurve schiet omhoog.'},
+  {t:'21:00',n:'Zonsondergang',sky:'dusk',load:1.14,wind:.1,zon:0,gas:1,therm:.7,ev:'De zon is weg, maar de airco’s draaien nog: de eendencurve schiet omhoog.'},
   {t:'23:30',n:'Tropische nacht',sky:'night',load:.6,wind:.15,zon:0,gas:1,therm:.85,ev:'Het koelt nauwelijks af; centrales zijn nog beperkt.'}]},
  herfst:{n:'Herfst',d:'Onvoorspelbaar: stormen en een onzekere gasprijs',fx:{leaves:1},scen:[
   {t:'02:00',n:'Herfststorm',sky:'storm',load:.45,wind:1,zon:0,gas:1.2,ev:'Een storm trekt over het land: windparken op vol vermogen.'},
-  {t:'07:30',n:'Storm gaat liggen',sky:'dawn',load:.85,wind:.35,zon:.05,gas:1.2,ev:'De wind neemt sneller af dan voorspeld.'},
+  {t:'07:30',n:'Storm gaat liggen',sky:'dawn',load:1.02,wind:.35,zon:.05,gas:1.2,ev:'De wind neemt sneller af dan voorspeld.'},
   {t:'12:00',n:'Wisselvallig',sky:'grey',load:.7,wind:.6,zon:.45,gas:1.2,ev:'Zon en buien wisselen elkaar af.'},
-  {t:'17:00',n:'Gasprijs schiet omhoog',sky:'dusk',load:.9,wind:.2,zon:.05,gas:1.8,ev:'Spanningen op de gasmarkt: de gasprijs ligt 80% boven normaal.'},
-  {t:'19:00',n:'Eerste koude avond',sky:'red',load:1,wind:.15,zon:0,gas:1.8,ev:'De eerste koude avond van het jaar: overal gaat de verwarming aan.'},
+  {t:'17:00',n:'Gasprijs schiet omhoog',sky:'dusk',load:1.08,wind:.2,zon:.05,gas:1.8,ev:'Spanningen op de gasmarkt: de gasprijs ligt 80% boven normaal.'},
+  {t:'19:00',n:'Eerste koude avond',sky:'red',load:1.2,wind:.15,zon:0,gas:1.8,ev:'De eerste koude avond van het jaar: overal gaat de verwarming aan.'},
   {t:'23:00',n:'Nieuwe storm',sky:'storm',load:.5,wind:.95,zon:0,gas:1.5,ev:'Het volgende stormfront komt binnen.'}]}};
 let SEASON='standaard',SCEN=SEASONS.standaard.scen;
 function useSeason(k){SEASON=SEASONS[k]?k:'standaard';SCEN=SEASONS[SEASON].scen;}
@@ -206,8 +206,8 @@ const HINTS={
  piek:['Rustige nacht: je bent vrijwel zeker niet nodig. Bieden op je kosten kost niets.',
   'Waarschijnlijk niet nodig, tenzij het aanbod tegenvalt. Bied minimaal je kosten.',
   'Middag met veel zon: geen kans. Bied je kosten of sla over.',
-  'Dit is jouw uur. Is er zonder jou te weinig aanbod, dan bepaal jij de prijs. Hoe hoog durf je te gaan voordat afnemers afhaken?',
-  'Duurder gas maakt ook jou duurder: €240/MWh. Is de markt krap genoeg dat je nodig bent?',
+  'Dit is jouw uur. Ben jij de laatste centrale die nodig is, dan bepaalt jouw bod de prijs voor iedereen. Bied je op je kosten, dan verdien je niets. Hoe ver durf je erboven te gaan voordat afnemers afhaken?',
+  'Duurder gas maakt ook jou duurder: €240/MWh. Ben je nodig, dan betalen afnemers jouw bod. Een marge boven je kosten is de enige manier om hier iets te verdienen.',
   'Stormnacht: geen kans.'],
  bat:['Veel wind en weinig vraag: vaak een goedkoop uur. Laad als je verwacht later duurder te kunnen verkopen.',
   'Ochtendpiek: duurder dan vannacht. Verkopen kan, maar de avondpiek wordt waarschijnlijk nog duurder.',
@@ -375,9 +375,9 @@ function autoHint(pl,s,i){const r=pl.role,n=SCEN.length,last=i===n-1,sub=s.sub||
   if(surplus)return`Overschot: je bent waarschijnlijk niet nodig. Bied niet onder je kosten van €${c}.`;
   if(gasUp)return`Door de dure gasprijs zijn je kosten €${c}/MWh. Pas je bod aan, anders verkoop je met verlies.${cut}`;
   return`Bied rond je kosten (€${c}/MWh). Stijgt de vraag, dan bepaal jij vaak de prijs.${cut}`;}
- if(r==='piek'){if(tight||(therm<1&&s.load>=.9))return'Dit kan jouw uur zijn: is er zonder jou te weinig aanbod, dan bepaal jij de prijs. Hoe hoog durf je te gaan voordat afnemers afhaken?';
+ if(r==='piek'){if(tight||(therm<1&&s.load>=.9)||s.load>=1)return`Dit kan jouw uur zijn. Ben jij de laatste centrale die nodig is, dan bepaalt jouw bod de prijs voor iedereen. Bied je op je kosten (€${c}), dan verdien je niets. Hoe ver durf je erboven te gaan voordat afnemers afhaken?`;
   if(surplus)return'Overschot: geen kans. Bied je kosten of sla over.';
-  return`Je bent alleen nodig als het krap wordt. Bied minimaal je kosten (€${c}).`;}
+  return`Je bent alleen nodig als het krap wordt. Bied minimaal je kosten (€${c}). Ben je toch de laatste die nodig is, dan bepaalt jouw bod de prijs: een kleine marge kan dan lonen.`;}
  if(r==='bat'){if(last)return'Laatste ronde: lading die overblijft, levert niets op. Verkoop wat je nog hebt.';
   if(surplus)return'Overschot verwacht: laad nu. Misschien word je zelfs betaald om stroom af te nemen.';
   if(tight)return'Krapste moment: ontlaad, met een hoge minimumprijs.';
