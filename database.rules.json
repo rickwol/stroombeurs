@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "owners": {
+      "$code": {
+        ".read": true,
+        ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+      }
+    },
+    "games": {
+      "$code": {
+        "state": {
+          ".read": true,
+          ".write": "auth != null && root.child('owners').child($code).val() === auth.uid"
+        },
+        "players": {
+          ".read": true,
+          ".write": "auth != null && root.child('owners').child($code).val() === auth.uid",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.child('name').isString() && newData.child('name').val().length <= 24"
+          }
+        },
+        "bids": {
+          ".read": "auth != null && root.child('owners').child($code).val() === auth.uid",
+          ".write": "auth != null && root.child('owners').child($code).val() === auth.uid",
+          "$round": {
+            "$uid": {
+              ".read": "auth != null && auth.uid === $uid",
+              ".write": "auth != null && auth.uid === $uid && root.child('games').child($code).child('state/phase').val() === 'bid' && root.child('games').child($code).child('state/round').val() + '' === $round",
+              ".validate": "newData.child('q').isNumber() && newData.child('p').isNumber()"
+            }
+          }
+        }
+      }
+    }
+  }
+}

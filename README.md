@@ -1,0 +1,79 @@
+# Stroombeurs ⚡ handelsspel voor de day-ahead elektriciteitsmarkt
+
+Een klassikaal multiplayer-spel: studenten handelen met hun telefoon in een day-ahead veiling met uniforme prijs (pay-as-clear). De docent projecteert de merit order, de marktprijs en de ranglijst.
+
+- **Negen rollen:** kerncentrale, windpark, zonnepark, gascentrale, piekcentrale, batterij, energieleverancier, industrie (elektrolyser) en laadplein-exploitant.
+- **Zes rondes:** nacht, ochtendpiek, zonnige middag, windstille avondpiek, gasprijsschok en stormnacht.
+- Studenten hebben **geen account** nodig: ze scannen een QR-code en vullen een naam in.
+
+Het spel is één statische pagina (`index.html`) op GitHub Pages. Firebase Realtime Database zorgt voor de live verbinding.
+
+---
+
+## Installatie (eenmalig, ±15 minuten)
+
+### 1. Firebase-project aanmaken
+1. Ga naar <https://console.firebase.google.com> en klik **Project toevoegen**. Google Analytics mag uit.
+2. **Build → Authentication → Aan de slag → Sign-in method → Anoniem → Inschakelen.**
+3. **Build → Realtime Database → Database maken.**
+   - Kies locatie **Belgium (europe-west1)**.
+   - Kies **Starten in vergrendelde modus**.
+4. Open in de Realtime Database het tabblad **Regels**. Vervang de inhoud door die van `database.rules.json` en klik **Publiceren**.
+5. **Projectinstellingen (tandwiel) → Algemeen → Je apps → Web (`</>`).** Registreer een app (Hosting hoeft niet). Kopieer het `firebaseConfig`-object.
+
+### 2. Config invullen
+Plak de waarden in `config.js`. Controleer dat **`databaseURL`** erbij staat. Die zie je bovenaan de Realtime Database-pagina.
+
+De config is niet geheim en mag gewoon in een openbare repo. De beveiliging zit in de databaseregels:
+- alleen de docent die een spel aanmaakt, kan het spel sturen;
+- studenten kunnen alleen hun eigen bod indienen, en alleen zolang de markt open is;
+- studenten kunnen elkaars biedingen niet lezen.
+
+### 3. Op GitHub Pages zetten
+1. Maak een nieuwe repository, bijvoorbeeld `stroombeurs`, en upload `index.html`, `config.js`, `database.rules.json` en `README.md`.
+2. Ga naar **Settings → Pages → Build and deployment → Deploy from a branch**. Kies `main` en `/ (root)` en sla op.
+3. Na ongeveer een minuut staat het spel op `https://<gebruikersnaam>.github.io/stroombeurs/`.
+4. Lukt anoniem inloggen niet, voeg dan in Firebase via **Authentication → Settings → Authorized domains** het domein `<gebruikersnaam>.github.io` toe.
+
+Lokaal testen kan ook. Draai `python3 -m http.server` in deze map en open <http://localhost:8000>. Openen als bestand (`file://`) werkt niet.
+
+---
+
+## In de les
+
+1. Open de site op de laptop die aan de beamer hangt en klik **Nieuw spel starten**. Je krijgt een spelcode en een QR-code.
+2. Studenten scannen de QR-code (of gaan naar de site en typen de code) en vullen een naam in. Ze krijgen automatisch een rol in een vaste volgorde, zodat vraag en aanbod in balans blijven. Tik op een rol om die te wijzigen.
+3. Klik **Start de handelsdag**. Per ronde:
+   - studenten dienen een volume en een minimum- of maximumprijs in;
+   - jij ziet hoeveel biedingen binnen zijn, met een optionele timer van 60 of 90 seconden;
+   - **Sluit markt en bereken** toont de merit order, de marktprijs en de ranglijst.
+4. Na zes rondes volgen de eindstand, de beste speler per rol en het prijsverloop van de dag.
+
+**Tips**
+- Weinig studenten? Vul aan met **+ 9 testspelers** (bots).
+- Zelf de studentenweergave bekijken: open de spellink in een privévenster of op je telefoon.
+- Gebruik als docent steeds **dezelfde browser**. Firebase herkent je als eigenaar via een anonieme login die in die browser bewaard blijft. Op de startpagina staat een knop **Terug naar spel …**.
+
+---
+
+## Spelregels in het kort
+
+| Rol | Kant | Kern van de rol |
+|---|---|---|
+| Kerncentrale | aanbod | 300 MW, €12/MWh; onder 150 MW kost €3.000 extra |
+| Windpark | aanbod | 250 MW × windfactor, €0/MWh |
+| Zonnepark | aanbod | 200 MW × zonfactor, €0/MWh |
+| Gascentrale | aanbod | 400 MW, €85/MWh (stijgt mee met de gasprijs) |
+| Piekcentrale | aanbod | 150 MW, €150/MWh (stijgt mee met de gasprijs) |
+| Batterij | beide | 100 MW / 200 MWh, 90% laadrendement |
+| Energieleverancier | vraag | Vaste klantvraag, verkoopt voor €140/MWh; tekort tegen onbalansprijs (≥ €300 of 2× de marktprijs) |
+| Industrie | vraag | Tot 250 MW; stroom levert €120/MWh op |
+| Laadplein-exploitant | vraag | Tot 150 MW per ronde, verkoopt voor €250/MWh; moet 450 MWh per dag laden, tekort kost €400/MWh |
+
+**Vereffening:** biedingen worden gesorteerd tot een aanbodcurve (oplopend) en een vraagcurve (aflopend). De marginale eenheid in het snijpunt bepaalt één prijs voor iedereen. Gelijke biedingen op de marge worden naar rato toegewezen. De prijsgrenzen zijn −€500 en €4.000/MWh.
+
+Scenario's, kosten en rollen staan bovenaan het script in `index.html` (`ROLES` en `SCEN`) en zijn makkelijk aan te passen.
+
+## Onderhoud
+- Elk spel staat in de database onder `games/<code>`. Oude spellen kun je in de Firebase-console verwijderen, onder `games` en `owners`.
+- Het gratis Spark-abonnement van Firebase is ruim voldoende voor een klas.
