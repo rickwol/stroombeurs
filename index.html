@@ -90,6 +90,10 @@ label{font-weight:600;font-size:14px;display:block;margin-bottom:8px;color:#cfd5
 .season span{font-size:13px;color:var(--mute);font-weight:400;line-height:1.35}
 .season.on{border-color:var(--volt);box-shadow:0 0 0 1px var(--volt),0 0 30px -10px var(--volt)}
 .season.on b{color:var(--volt)}
+.lang{display:inline-flex;gap:2px;background:rgba(7,8,13,.55);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:12px;padding:3px}
+.lang button{min-height:34px;padding:0 10px;border:0;background:transparent;font-size:13px;border-radius:9px}
+.lang button.on{background:var(--volt);color:var(--volt-ink)}
+.pred{border-top:1px dashed var(--line);padding-top:14px}
 .phone{max-width:520px;margin:0 auto;padding:4px 14px 40px}
 .rolecard{border-radius:22px;padding:20px;position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--rc) 38%,#0b0d14),#0b0d14 75%);border:1px solid color-mix(in srgb,var(--rc) 55%,transparent);box-shadow:0 0 60px -20px var(--rc)}
 .rolecard svg{position:absolute;right:-6px;top:-6px;width:130px;height:130px;opacity:.9;filter:drop-shadow(0 0 18px var(--rc))}
@@ -124,6 +128,21 @@ details.hint p{padding-bottom:12px}
 <main id="app"><div class="wrap"><p class="mute pulse">Bezig met verbinden met de markt…</p></div></main>
 <script>
 {
+/* ---------- taal / language ---------- */
+let LANG=(()=>{try{const v=localStorage.getItem('sb-lang');if(v==='nl'||v==='en')return v;}catch(e){}return(navigator.language||'nl').toLowerCase().startsWith('nl')?'nl':'en';})();
+const tr=(nl,en)=>LANG==='en'?en:nl;
+const LOC=()=>LANG==='en'?'en-GB':'nl-NL';
+const ROLE_EN={kern:['Nuclear plant','Low costs (€12/MWh) but inflexible: deliver less than 150 MW and you pay €3,000 in shutdown and restart costs. Sometimes a negative bid pays off.'],
+ wind:['Wind farm','No fuel costs. Your available capacity depends on the wind. Whatever you don’t sell is lost.'],
+ zon:['Solar park','No fuel costs, but you only produce when the sun shines. Watch out for the midday price dip.'],
+ gas:['Gas plant','Flexible, but your marginal costs follow the gas price.'],
+ piek:['Peaker plant','Only runs when supply is tight. High costs, so you earn from scarcity prices.'],
+ bat:['Battery','100 MW / 200 MWh. Charge cheap, discharge expensive. Charging loses 10%. Each round you choose: charge (buy) or discharge (sell).'],
+ lev:['Energy retailer','Your customers pay a fixed tariff of €140/MWh. Buy too little and you pay the imbalance price on the shortfall: at least €300/MWh, or 2× the market price.'],
+ ind:['Industry','Your electrolyser makes hydrogen worth €120 per MWh of electricity. Above that price you are better off idle.'],
+ ev:['Charging hub operator','You sell charging power to EV drivers for €250/MWh. Over the day you must charge 450 MWh; any shortfall at the end costs €400/MWh. Max 150 MW per round.']};
+const rn=r=>LANG==='en'?ROLE_EN[r][0]:ROLES[r].n, rtip=r=>LANG==='en'?ROLE_EN[r][1]:ROLES[r].tip;
+const pname=p=>p.bot?'Bot '+rn(p.role):p.name;
 /* ---------- game model ---------- */
 const ROLES={
  kern:{n:'Kerncentrale',side:'s',cap:300,col:'#a274ff',tip:'Lage kosten (€12/MWh), maar inflexibel: lever je minder dan 150 MW, dan betaal je €3.000 aan afschakel- en opstartkosten. Soms loont een negatief bod.'},
@@ -139,41 +158,41 @@ const ROLES={
 const ORDER=['lev','gas','wind','ind','kern','zon','bat','ev','piek'];
 /* speldagen: standaard + vier seizoenen. sky = scène; kern/therm = beschikbaarheid (0-1); sub = subsidie €/MWh voor wind en zon */
 const SEASONS={
- standaard:{n:'Standaard',d:'Klassieke dag: van nacht tot stormnacht',fx:{},scen:[
-  {t:'03:00',n:'Nacht',sky:'night',load:.42,wind:.75,zon:0,gas:1,ev:'Rustige nacht met behoorlijk wat wind.'},
-  {t:'08:00',n:'Ochtendpiek',sky:'dawn',load:1.02,wind:.45,zon:.25,gas:1,ev:'Iedereen staat op; de zon komt langzaam op.'},
-  {t:'13:00',n:'Zonnige middag',sky:'noon',load:.52,wind:.35,zon:1,gas:1,ev:'Volle zon op alle panelen. Zakt de prijs onder nul?'},
-  {t:'18:00',n:'Windstille avondpiek',sky:'dusk',load:1.2,wind:.08,zon:.05,gas:1,ev:'Bijna geen wind, geen zon en de hoogste vraag van de dag.'},
-  {t:'20:00',n:'Gasprijsschok',sky:'red',load:1.08,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
-  {t:'23:00',n:'Stormnacht',sky:'storm',load:.45,wind:1,zon:0,gas:1.6,ev:'Er trekt een storm over: windparken draaien op vol vermogen.'}]},
- winter:{n:'Winter',d:'Krapte: hoge vraag, duur gas, Dunkelflaute en een storing',fx:{snow:1},scen:[
-  {t:'03:00',n:'Vriesnacht',sky:'night',load:.6,wind:.5,zon:0,gas:1.4,ev:'Het vriest: warmtepompen draaien ook ’s nachts door. Matige wind.'},
-  {t:'08:00',n:'Koude ochtendpiek',sky:'dawn',load:1.14,wind:.35,zon:.05,gas:1.4,ev:'Iedereen zet de verwarming hoger. De zon komt pas om half negen op.'},
-  {t:'12:00',n:'Grijze middag',sky:'grey',load:.8,wind:.25,zon:.25,gas:1.4,ev:'Zwaar bewolkt: de zonneparken leveren maar een kwart.'},
-  {t:'17:30',n:'Dunkelflaute',sky:'night',load:1.2,wind:.03,zon:0,gas:1.4,ev:'Donker, ijskoud en windstil: de hoogste vraag van het jaar.'},
-  {t:'19:00',n:'Storing kerncentrale',sky:'red',load:1.2,wind:.1,zon:0,gas:1.4,kern:0,ev:'De kerncentrale valt onverwacht uit: 300 MW minder aanbod.'},
-  {t:'23:00',n:'Wind steekt op',sky:'night',load:.7,wind:.8,zon:0,gas:1.4,kern:0,ev:'Een front brengt wind. De kerncentrale is nog niet terug.'}]},
- lente:{n:'Lente',d:'Overschot: wind en zon bij lage vraag op een feestdag',fx:{blossom:1},scen:[
-  {t:'04:00',n:'Winderige nacht',sky:'night',load:.4,wind:.85,zon:0,gas:1,ev:'Lage vraag en een stevige westenwind.'},
-  {t:'09:00',n:'Hemelvaartsdag',sky:'dawn',load:.5,wind:.7,zon:.5,gas:1,ev:'Feestdag: kantoren en fabrieken zijn dicht, de vraag blijft laag.'},
-  {t:'13:00',n:'Zon én wind',sky:'noon',load:.42,wind:.65,zon:1,gas:1,ev:'Volop zon en wind bij een lage vraag: dit wordt een overschot.'},
-  {t:'16:00',n:'Buien',sky:'grey',load:.55,wind:.9,zon:.3,gas:1,ev:'Buien trekken over: de zon valt weg, de wind trekt aan.'},
-  {t:'19:00',n:'Windstille lenteavond',sky:'dusk',load:1.08,wind:.08,zon:.05,gas:1,ev:'De wind valt ineens weg en de zon gaat onder: na een dag overschot wordt het opeens krap.'},
-  {t:'23:00',n:'Rustige nacht',sky:'night',load:.45,wind:.35,zon:0,gas:1,ev:'Weinig wind en weinig vraag.'}]},
- zomer:{n:'Zomer',d:'Eendencurve en negatieve prijzen, met een hittegolf',fx:{heat:1},scen:[
-  {t:'04:00',n:'Warme nacht',sky:'night',load:.45,wind:.2,zon:0,gas:1,ev:'Een windstille, warme nacht.'},
-  {t:'10:00',n:'Zonnige ochtend',sky:'noon',load:.55,wind:.25,zon:.75,gas:1,ev:'De zon klimt snel: zonneparken draaien al op driekwart.'},
-  {t:'13:00',n:'Pinksterzondag',sky:'heat',load:.15,wind:1,zon:1,gas:1,sub:60,ev:'Pinksterzondag, onbewolkt en een stevige bries: veel meer aanbod dan vraag. Wind- en zonneparken krijgen €60/MWh subsidie bovenop de marktprijs.'},
-  {t:'15:00',n:'Hittegolf',sky:'heat',load:.65,wind:.1,zon:.9,gas:1,therm:.7,sub:60,ev:'Het rivierwater is te warm: gas- en kerncentrales mogen maar 70% leveren. Airco’s draaien vol.'},
-  {t:'21:00',n:'Zonsondergang',sky:'dusk',load:1.14,wind:.1,zon:0,gas:1,therm:.7,ev:'De zon is weg, maar de airco’s draaien nog: de eendencurve schiet omhoog.'},
-  {t:'23:30',n:'Tropische nacht',sky:'night',load:.6,wind:.15,zon:0,gas:1,therm:.85,ev:'Het koelt nauwelijks af; centrales zijn nog beperkt.'}]},
- herfst:{n:'Herfst',d:'Onvoorspelbaar: stormen en een onzekere gasprijs',fx:{leaves:1},scen:[
-  {t:'02:00',n:'Herfststorm',sky:'storm',load:.45,wind:1,zon:0,gas:1.2,ev:'Een storm trekt over het land: windparken op vol vermogen.'},
-  {t:'07:30',n:'Storm gaat liggen',sky:'dawn',load:1.02,wind:.35,zon:.05,gas:1.2,ev:'De wind neemt sneller af dan voorspeld.'},
-  {t:'12:00',n:'Wisselvallig',sky:'grey',load:.7,wind:.6,zon:.45,gas:1.2,ev:'Zon en buien wisselen elkaar af.'},
-  {t:'17:00',n:'Gasprijs schiet omhoog',sky:'dusk',load:1.08,wind:.2,zon:.05,gas:1.8,ev:'Spanningen op de gasmarkt: de gasprijs ligt 80% boven normaal.'},
-  {t:'19:00',n:'Eerste koude avond',sky:'red',load:1.2,wind:.15,zon:0,gas:1.8,ev:'De eerste koude avond van het jaar: overal gaat de verwarming aan.'},
-  {t:'23:00',n:'Nieuwe storm',sky:'storm',load:.5,wind:.95,zon:0,gas:1.5,ev:'Het volgende stormfront komt binnen.'}]}};
+ standaard:{n:'Standaard',d:'Klassieke dag: van nacht tot stormnacht',ne:'Standard',de:'Classic day: from night to stormy night',fx:{},scen:[
+  {t:'03:00',n:'Nacht',ne:'Night',ee:'A quiet night with a fair amount of wind.',sky:'night',load:.42,wind:.75,zon:0,gas:1,ev:'Rustige nacht met behoorlijk wat wind.'},
+  {t:'08:00',n:'Ochtendpiek',ne:'Morning peak',ee:'Everyone gets up; the sun rises slowly.',sky:'dawn',load:1.02,wind:.45,zon:.25,gas:1,ev:'Iedereen staat op; de zon komt langzaam op.'},
+  {t:'13:00',n:'Zonnige middag',ne:'Sunny afternoon',ee:'Full sun on every panel. Will the price drop below zero?',sky:'noon',load:.52,wind:.35,zon:1,gas:1,ev:'Volle zon op alle panelen. Zakt de prijs onder nul?'},
+  {t:'18:00',n:'Windstille avondpiek',ne:'Windless evening peak',ee:'Hardly any wind, no sun and the highest demand of the day.',sky:'dusk',load:1.2,wind:.08,zon:.05,gas:1,ev:'Bijna geen wind, geen zon en de hoogste vraag van de dag.'},
+  {t:'20:00',n:'Gasprijsschok',ne:'Gas price shock',ee:'The gas price rises 60%: marginal costs of gas plants go up.',sky:'red',load:1.08,wind:.3,zon:0,gas:1.6,ev:'De gasprijs stijgt 60%: de marginale kosten van gascentrales gaan omhoog.'},
+  {t:'23:00',n:'Stormnacht',ne:'Stormy night',ee:'A storm passes through: wind farms run at full capacity.',sky:'storm',load:.45,wind:1,zon:0,gas:1.6,ev:'Er trekt een storm over: windparken draaien op vol vermogen.'}]},
+ winter:{n:'Winter',d:'Krapte: hoge vraag, duur gas, Dunkelflaute en een storing',ne:'Winter',de:'Scarcity: high demand, expensive gas, Dunkelflaute and an outage',fx:{snow:1},scen:[
+  {t:'03:00',n:'Vriesnacht',ne:'Freezing night',ee:'It is freezing: heat pumps keep running at night. Moderate wind.',sky:'night',load:.6,wind:.5,zon:0,gas:1.4,ev:'Het vriest: warmtepompen draaien ook ’s nachts door. Matige wind.'},
+  {t:'08:00',n:'Koude ochtendpiek',ne:'Cold morning peak',ee:'Everyone turns up the heating. The sun doesn’t rise until half past eight.',sky:'dawn',load:1.14,wind:.35,zon:.05,gas:1.4,ev:'Iedereen zet de verwarming hoger. De zon komt pas om half negen op.'},
+  {t:'12:00',n:'Grijze middag',ne:'Grey afternoon',ee:'Heavy cloud: solar parks deliver only a quarter.',sky:'grey',load:.8,wind:.25,zon:.25,gas:1.4,ev:'Zwaar bewolkt: de zonneparken leveren maar een kwart.'},
+  {t:'17:30',n:'Dunkelflaute',ne:'Dunkelflaute',ee:'Dark, freezing and windless: the highest demand of the year.',sky:'night',load:1.2,wind:.03,zon:0,gas:1.4,ev:'Donker, ijskoud en windstil: de hoogste vraag van het jaar.'},
+  {t:'19:00',n:'Storing kerncentrale',ne:'Nuclear outage',ee:'The nuclear plant trips unexpectedly: 300 MW less supply.',sky:'red',load:1.2,wind:.1,zon:0,gas:1.4,kern:0,ev:'De kerncentrale valt onverwacht uit: 300 MW minder aanbod.'},
+  {t:'23:00',n:'Wind steekt op',ne:'Wind picks up',ee:'A front brings wind. The nuclear plant is not back yet.',sky:'night',load:.7,wind:.8,zon:0,gas:1.4,kern:0,ev:'Een front brengt wind. De kerncentrale is nog niet terug.'}]},
+ lente:{n:'Lente',d:'Overschot: wind en zon bij lage vraag op een feestdag',ne:'Spring',de:'Surplus: wind and sun with low demand on a public holiday',fx:{blossom:1},scen:[
+  {t:'04:00',n:'Winderige nacht',ne:'Windy night',ee:'Low demand and a strong westerly wind.',sky:'night',load:.4,wind:.85,zon:0,gas:1,ev:'Lage vraag en een stevige westenwind.'},
+  {t:'09:00',n:'Hemelvaartsdag',ne:'Ascension Day',ee:'Public holiday: offices and factories are closed, demand stays low.',sky:'dawn',load:.5,wind:.7,zon:.5,gas:1,ev:'Feestdag: kantoren en fabrieken zijn dicht, de vraag blijft laag.'},
+  {t:'13:00',n:'Zon én wind',ne:'Sun and wind',ee:'Plenty of sun and wind with low demand: this will be a surplus.',sky:'noon',load:.42,wind:.65,zon:1,gas:1,ev:'Volop zon en wind bij een lage vraag: dit wordt een overschot.'},
+  {t:'16:00',n:'Buien',ne:'Showers',ee:'Showers pass over: the sun disappears, the wind picks up.',sky:'grey',load:.55,wind:.9,zon:.3,gas:1,ev:'Buien trekken over: de zon valt weg, de wind trekt aan.'},
+  {t:'19:00',n:'Windstille lenteavond',ne:'Windless spring evening',ee:'The wind suddenly drops and the sun sets: after a day of surplus, supply is suddenly tight.',sky:'dusk',load:1.08,wind:.08,zon:.05,gas:1,ev:'De wind valt ineens weg en de zon gaat onder: na een dag overschot wordt het opeens krap.'},
+  {t:'23:00',n:'Rustige nacht',ne:'Quiet night',ee:'Little wind and little demand.',sky:'night',load:.45,wind:.35,zon:0,gas:1,ev:'Weinig wind en weinig vraag.'}]},
+ zomer:{n:'Zomer',d:'Eendencurve en negatieve prijzen, met een hittegolf',ne:'Summer',de:'Duck curve and negative prices, plus a heatwave',fx:{heat:1},scen:[
+  {t:'04:00',n:'Warme nacht',ne:'Warm night',ee:'A windless, warm night.',sky:'night',load:.45,wind:.2,zon:0,gas:1,ev:'Een windstille, warme nacht.'},
+  {t:'10:00',n:'Zonnige ochtend',ne:'Sunny morning',ee:'The sun climbs fast: solar parks already run at three quarters.',sky:'noon',load:.55,wind:.25,zon:.75,gas:1,ev:'De zon klimt snel: zonneparken draaien al op driekwart.'},
+  {t:'13:00',n:'Pinksterzondag',ne:'Whit Sunday',ee:'Whit Sunday, clear skies and a strong breeze: far more supply than demand. Wind and solar parks get a €60/MWh subsidy on top of the market price.',sky:'heat',load:.15,wind:1,zon:1,gas:1,sub:60,ev:'Pinksterzondag, onbewolkt en een stevige bries: veel meer aanbod dan vraag. Wind- en zonneparken krijgen €60/MWh subsidie bovenop de marktprijs.'},
+  {t:'15:00',n:'Hittegolf',ne:'Heatwave',ee:'River water is too warm: gas and nuclear plants may only deliver 70%. Air conditioners run flat out.',sky:'heat',load:.65,wind:.1,zon:.9,gas:1,therm:.7,sub:60,ev:'Het rivierwater is te warm: gas- en kerncentrales mogen maar 70% leveren. Airco’s draaien vol.'},
+  {t:'21:00',n:'Zonsondergang',ne:'Sunset',ee:'The sun is gone but air conditioners are still running: the duck curve shoots up.',sky:'dusk',load:1.14,wind:.1,zon:0,gas:1,therm:.7,ev:'De zon is weg, maar de airco’s draaien nog: de eendencurve schiet omhoog.'},
+  {t:'23:30',n:'Tropische nacht',ne:'Tropical night',ee:'It barely cools down; plants are still limited.',sky:'night',load:.6,wind:.15,zon:0,gas:1,therm:.85,ev:'Het koelt nauwelijks af; centrales zijn nog beperkt.'}]},
+ herfst:{n:'Herfst',d:'Onvoorspelbaar: stormen en een onzekere gasprijs',ne:'Autumn',de:'Unpredictable: storms and an uncertain gas price',fx:{leaves:1},scen:[
+  {t:'02:00',n:'Herfststorm',ne:'Autumn storm',ee:'A storm sweeps the country: wind farms at full capacity.',sky:'storm',load:.45,wind:1,zon:0,gas:1.2,ev:'Een storm trekt over het land: windparken op vol vermogen.'},
+  {t:'07:30',n:'Storm gaat liggen',ne:'Storm dies down',ee:'The wind drops faster than forecast.',sky:'dawn',load:1.02,wind:.35,zon:.05,gas:1.2,ev:'De wind neemt sneller af dan voorspeld.'},
+  {t:'12:00',n:'Wisselvallig',ne:'Changeable',ee:'Sun and showers alternate.',sky:'grey',load:.7,wind:.6,zon:.45,gas:1.2,ev:'Zon en buien wisselen elkaar af.'},
+  {t:'17:00',n:'Gasprijs schiet omhoog',ne:'Gas price spikes',ee:'Tension on the gas market: the gas price is 80% above normal.',sky:'dusk',load:1.08,wind:.2,zon:.05,gas:1.8,ev:'Spanningen op de gasmarkt: de gasprijs ligt 80% boven normaal.'},
+  {t:'19:00',n:'Eerste koude avond',ne:'First cold evening',ee:'The first cold evening of the year: heating goes on everywhere.',sky:'red',load:1.2,wind:.15,zon:0,gas:1.8,ev:'De eerste koude avond van het jaar: overal gaat de verwarming aan.'},
+  {t:'23:00',n:'Nieuwe storm',ne:'New storm',ee:'The next storm front arrives.',sky:'storm',load:.5,wind:.95,zon:0,gas:1.5,ev:'Het volgende stormfront komt binnen.'}]}};
 let SEASON='standaard',SCEN=SEASONS.standaard.scen;
 function useSeason(k){SEASON=SEASONS[k]?k:'standaard';SCEN=SEASONS[SEASON].scen;}
 
@@ -233,6 +252,61 @@ const HINTS={
   'Duurste uur van de dag: sla liever over, tenzij je achterloopt met laden.',
   'Duur gas. Hoeveel moet je nog laden? Elke MWh tekort kost straks €400.',
   'Laatste ronde: wat je nu niet laadt, kost €400/MWh boete. Bied genoeg om zeker te laden.']};
+const HINTS_EN={
+ kern:['Low demand and plenty of wind: the price may be low. Below 150 MW you pay €3,000. What’s worse: selling an hour below cost, or that penalty?',
+  'Demand is rising. A gas plant will probably set the price and you earn the gap with your €12. Offer your full capacity.',
+  'Lots of sun pushes the price down. A low or even negative bid on your minimum load prevents a shutdown.',
+  'The tightest hour of the day. You don’t need to bid high to get the high price: everyone gets the same market price (pay-as-clear).',
+  'Gas gets more expensive, so the price set by gas plants rises. Your costs stay the same: this is your hour.',
+  'Storm: wind at full capacity and little demand. High chance of a very low or negative price. Protect your minimum load.'],
+ wind:['Your marginal costs are zero and whatever you don’t sell is lost. Bid around €0 and you almost always run.',
+  'Moderate wind and rising demand: you will certainly be dispatched. Bidding higher earns nothing extra; you get the market price anyway.',
+  'Together with the solar parks a lot of free power hits the market. How low are you willing to go?',
+  'Hardly any wind: little to sell, but the price is high. Bid low so you are sure to run.',
+  'A higher gas price means a higher market price. Make sure all your capacity is sold.',
+  'Storm: your best production hour, but every wind farm runs at once. How far can the price fall? Look at last night.'],
+ zon:['It’s night: you have no capacity. Watch how the market behaves.',
+  'The sun rises: a little capacity at a price probably set by gas. Bid low so you are sure to run.',
+  'Full sun: your hour, but also every other solar park’s. Bid a realistic minimum; a negative price is possible.',
+  'Hardly any sun left. Bid your small volume low and you still get the high peak price.',
+  'After sunset: no capacity.',
+  'Night: no capacity.'],
+ gas:['Low demand and lots of wind: you may not be needed. Bid at your marginal cost; bidding lower means making a loss.',
+  'Morning peak: good chance you set the price. Bidding a bit above cost is possible, but too high and the peaker takes over.',
+  'Sun pushes the price down. If the price drops below your costs, you are better off not running.',
+  'Tightest hour. The peaker is more expensive than you: you can bid above your costs as long as you stay below theirs.',
+  'Your costs rose 60%, to €136/MWh. Adjust your bid or you will sell at a loss.',
+  'Storm and expensive gas: you are probably not needed. Don’t bid below your costs.'],
+ piek:['Quiet night: you are almost certainly not needed. Bidding at cost costs nothing.',
+  'Probably not needed unless supply falls short. Bid at least your costs.',
+  'Sunny afternoon: no chance. Bid your costs or skip.',
+  'This is your hour. If you are the last plant needed, your bid sets the price for everyone. Bid at cost and you earn nothing. How far above it dare you go before buyers drop out?',
+  'Pricier gas makes you pricier too: €240/MWh. If you are needed, buyers pay your bid. A margin above cost is the only way to earn anything here.',
+  'Stormy night: no chance.'],
+ bat:['Lots of wind and low demand: often a cheap hour. Charge if you expect to sell at a higher price later.',
+  'Morning peak: pricier than last night. You could sell, but the evening peak will probably be even pricier.',
+  'Full sun: often the lowest price of the day. Charge with a low maximum price.',
+  'Highest demand of the day: discharge. Expensive plants probably set the price, so your minimum price can be high.',
+  'Expensive gas keeps the price high. Still have energy? Sell it.',
+  'Last round: any charge left over earns nothing. Sell what you have.'],
+ lev:['Cover your customers’ demand or pay at least €300/MWh imbalance. Bid your full demand with a generous maximum price.',
+  'Demand is rising. Buying too little costs more than a high maximum price: you pay the market price, not your bid.',
+  'Low price expected. Buy exactly your demand; buying more is money wasted.',
+  'Tightest hour: bid too low and you get nothing and pay imbalance. Bid high enough.',
+  'High prices from expensive gas. Your tariff is €140, so you may lose money here, but imbalance is worse.',
+  'Stormy night with a low price expected: buy your full demand.'],
+ ind:['Low demand and lots of wind: chance of a price below €120. Bid up to your value.',
+  'Morning peak: the price will probably be around gas costs (~€85). Below €120 you still make a profit.',
+  'Full sun: possibly the cheapest power of the day. Buy in full.',
+  'Tightest hour: probably above €120. Standing idle beats making a loss.',
+  'Expensive gas: a price above €120 is likely. Consider not buying.',
+  'Storm: low price expected. Run at full capacity.'],
+ ev:['You must charge 450 MWh today, max 150 per round. A windy night is a good moment to start.',
+  'Morning peak: pricier. Can you postpone charging to cheaper hours? You have four rounds left.',
+  'Full sun: probably cheap. Charge in full.',
+  'Most expensive hour of the day: better skip unless you are behind on charging.',
+  'Expensive gas. How much do you still need? Every MWh short will cost €400.',
+  'Last round: whatever you don’t charge now costs €400/MWh. Bid enough to be sure you charge.']};
 const CAP=4000,FLOOR=-500,TARIEF=140,MINRUN=150,BATMAX=200,EVNEED=450,EVPEN=400;
 const mc=(r,s)=>r==='kern'?12:r==='gas'?Math.round(85*s.gas):r==='piek'?Math.round(150*s.gas):(r==='wind'||r==='zon')?-(s.sub||0):0;
 const demandOf=(st,s)=>Math.round((st.params?.L||0)*s.load);
@@ -273,8 +347,8 @@ function clear(sup,dem){sup=sup.slice().sort((a,b)=>a.p-b.p);dem=dem.slice().sor
 /* ---------- helpers ---------- */
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const eur=v=>(v<0?'−':'')+'€'+Math.abs(Math.round(v)).toLocaleString('nl-NL');
-const num=v=>Math.round(v).toLocaleString('nl-NL');
+const eur=v=>(v<0?'−':'')+'€'+Math.abs(Math.round(v)).toLocaleString(LOC());
+const num=v=>Math.round(v).toLocaleString(LOC());
 const clone=o=>JSON.parse(JSON.stringify(o));
 const ICON={
  wind:'<path d="M60 60 L60 118 M60 60 L20 30 M60 60 L104 34 M60 60 L58 8" stroke="#fff" stroke-width="10" stroke-linecap="round" fill="none"/>',
@@ -294,7 +368,7 @@ let fdb=null,G=null,uid=null,code='',teacher=false,state=null,loaded=false,playe
 const now=()=>Date.now()+offset;
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 const ALPH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function save(ns){useSeason(ns?.season);state=ns;schedule();const clean=JSON.parse(JSON.stringify(ns));saving=saving.then(()=>G.child('state').set(clean)).catch(e=>toast('Opslaan mislukt: '+(e?.code||e?.message||'fout')));}
+function save(ns){useSeason(ns?.season);state=ns;schedule();const clean=JSON.parse(JSON.stringify(ns));saving=saving.then(()=>G.child('state').set(clean)).catch(e=>toast(tr('Opslaan mislukt: ','Saving failed: ')+(e?.code||e?.message||'fout')));}
 function freshState(){return{season:SEASON,phase:'lobby',round:0,params:{L:0},players:{},result:null,hist:[],deadline:0};}
 function norm(v){if(!v)return null;useSeason(v.season);v.players=v.players||{};for(const p of Object.values(v.players)){if(p.last===undefined)p.last=null;p.soc=p.soc??100;p.chg=p.chg??0;p.tot=p.tot??0;}
  v.hist=Array.isArray(v.hist)?v.hist.slice():Object.keys(v.hist||{}).sort((a,b)=>a-b).map(k=>v.hist[k]);v.params=v.params||{L:0};v.deadline=v.deadline||0;
@@ -308,21 +382,22 @@ function syncPlayers(){if(!teacher||!state||!loaded)return;let ch=false;const st
   if(!st.players[pid]){st.players[pid]={name,role:ORDER[Object.keys(st.players).length%ORDER.length],tot:0,soc:100,chg:0,last:null};ch=true;}
   else if(st.players[pid].name!==name){st.players[pid].name=name;ch=true;}}
  if(ch)save(st);}
-function startGame(){const st=clone(state);for(const p of Object.values(st.players)){p.tot=0;p.soc=100;p.chg=0;p.cost=0;p.last=null;delete p.pen;delete p.pot;delete p.pct;delete p.tag;}
+function startGame(){const st=clone(state);for(const p of Object.values(st.players)){p.tot=0;p.soc=100;p.chg=0;p.cost=0;p.gp=0;p.last=null;delete p.pen;delete p.pot;delete p.pct;delete p.tag;}
  st.params={L:computeL(st.players)};st.phase='bid';st.round=1;st.result=null;st.hist=[];st.deadline=0;
  G.child('bids').remove().catch(()=>{}).then(()=>save(st));}
 function closeMarket(){const st=clone(state),s=SCEN[st.round-1],sup=[],dem=[],bids={};
  for(const[k,pl]of Object.entries(st.players)){const b=sanitize(pl.bot?botBid(pl,s,st):bidOf(k),pl,s,st);bids[k]=b;if(!b||b.q<=0)continue;
   const side=pl.role==='bat'?(b.m==='laden'?'d':'s'):ROLES[pl.role].side;(side==='s'?sup:dem).push({k,q:b.q,p:b.p,r:pl.role});}
  const R=clear(sup,dem),P=R.P??0;
- for(const[k,pl]of Object.entries(st.players)){const b=bids[k],q=R.acc[k]||0,r=pl.role;let pr=0,note='';
-  if(r==='bat'){if(b?.m==='laden'){pr=-q*P;pl.soc=Math.min(BATMAX,Math.round((pl.soc+q*.9)*10)/10);}else{pr=q*P;pl.soc=Math.max(0,pl.soc-q);}note='Laadtoestand nu '+num(pl.soc)+' MWh';}
-  else if(r==='lev'){const D=demandOf(st,s),sh=Math.max(0,D-q),imb=Math.max(300,2*P);pr=D*TARIEF-q*P-sh*imb;pl.cost=Math.round((pl.cost||0)+q*P+sh*imb);if(sh>0)note='Tekort '+num(sh)+' MW tegen onbalansprijs '+eur(imb)+'/MWh';}
+ for(const[k,pl]of Object.entries(st.players)){const b=bids[k],q=R.acc[k]||0,r=pl.role;let pr=0,note=null;
+  if(r==='bat'){if(b?.m==='laden'){pr=-q*P;pl.soc=Math.min(BATMAX,Math.round((pl.soc+q*.9)*10)/10);}else{pr=q*P;pl.soc=Math.max(0,pl.soc-q);}note={k:'bat',v:pl.soc};}
+  else if(r==='lev'){const D=demandOf(st,s),sh=Math.max(0,D-q),imb=Math.max(300,2*P);pr=D*TARIEF-q*P-sh*imb;pl.cost=Math.round((pl.cost||0)+q*P+sh*imb);if(sh>0)note={k:'short',sh,imb};}
   else if(r==='ind')pr=q*(120-P);
-  else if(r==='ev'){pr=q*(250-P);pl.chg+=q;note='Vandaag geladen: '+num(pl.chg)+' van '+EVNEED+' MWh';}
-  else{pr=q*(P-mc(r,s));if(r==='kern'&&q<MINRUN&&maxQ(pl,s,st)>=MINRUN){pr-=3000;note='Onder de minimumlast: €3.000 extra kosten';}}
+  else if(r==='ev'){pr=q*(250-P);pl.chg+=q;note={k:'ev',v:pl.chg};}
+  else{pr=q*(P-mc(r,s));if(r==='kern'&&q<MINRUN&&maxQ(pl,s,st)>=MINRUN){pr-=3000;note={k:'minrun'};}}
   const bid=b?(r==='bat'?{q:b.q,p:b.p,m:b.m}:{q:b.q,p:b.p}):null;
-  pl.tot=Math.round(pl.tot+pr);pl.last={r:st.round,q,pr:Math.round(pr),bid,note};}
+  pl.tot=Math.round(pl.tot+pr);pl.last={r:st.round,q,pr:Math.round(pr),bid,note};
+  const gv=pl.bot?NaN:Number(bidOf(k)?.g);if(isFinite(gv)&&R.P!=null){const pts=Math.round(100*Math.max(0,1-Math.abs(gv-R.P)/Math.max(50,Math.abs(R.P))));pl.last.g=gv;pl.last.gp=pts;pl.gp=(pl.gp||0)+pts;}}
  st.result={round:st.round,P:R.P,V:R.V,sup:sup.map(b=>[b.r,b.q,b.p,R.acc[b.k]||0]),dem:dem.map(b=>[b.r,b.q,b.p,R.acc[b.k]||0])};
  st.hist.push(R.P==null?'none':R.P);st.phase='res';st.deadline=0;save(st);}
 function nextRound(){const st=clone(state);
@@ -343,59 +418,59 @@ function scoreOf(pl,st){
  const pot=potentialOf(pl,st),act=pl.tot;
  if(pot>0)return{pot,pct:act/pot*100};
  return{pot,pct:act>=pot?100:Math.max(0,100*(1-(pot-act)/Math.max(Math.abs(pot),3000))),tag:'geen winstkans'};}
-const pctTxt=v=>(Math.round(v)).toLocaleString('nl-NL')+'%';
-const potTxt=p=>p.role==='lev'?'inkoop '+eur(p.cost||0)+' · ideaal '+eur(p.pot):eur(p.tot)+' van '+eur(p.pot)+(p.tag?' · '+p.tag:'');
+const pctTxt=v=>(Math.round(v)).toLocaleString(LOC())+'%';
+const potTxt=p=>p.role==='lev'?tr('inkoop ','purchases ')+eur(p.cost||0)+tr(' · ideaal ',' · ideal ')+eur(p.pot):eur(p.tot)+tr(' van ',' of ')+eur(p.pot)+(p.tag?' · '+tr('geen winstkans','no profit opportunity'):'');
 const byPct=()=>Object.entries(state?.players||{}).sort((a,b)=>((b[1].pct??-1e9)-(a[1].pct??-1e9))||((b[1].pot||0)-(a[1].pot||0)));
 function setTimer(sec){const st=clone(state);st.deadline=sec?now()+sec*1000:0;save(st);}
 function missingRoles(){const have=new Set(Object.values(state?.players||{}).map(p=>p.role));return ORDER.filter(r=>!have.has(r));}
-function addBots(){const miss=missingRoles();if(!miss.length)return toast('Alle rollen zijn al bezet');const st=clone(state);miss.forEach((r,i)=>{st.players['bot-'+Date.now().toString(36)+i]={name:'Bot '+ROLES[r].n,role:r,bot:true,tot:0,soc:100,chg:0,last:null};});save(st);toast(miss.length+(miss.length===1?' bot':' bots')+' toegevoegd');}
+function addBots(){const miss=missingRoles();if(!miss.length)return toast(tr('Alle rollen zijn al bezet','All roles are already taken'));const st=clone(state);miss.forEach((r,i)=>{st.players['bot-'+Date.now().toString(36)+i]={name:'Bot '+ROLES[r].n,role:r,bot:true,tot:0,soc:100,chg:0,last:null};});save(st);toast(miss.length+(miss.length===1?' bot':' bots')+tr(' toegevoegd',' added'));}
 function joinUrl(){return location.origin+location.pathname+'?spel='+code;}
 function join(name){me.name=name;store.set('sb-name-'+code,name);joined=true;const ref=G.child('players/'+uid);
- ref.onDisconnect().update({on:false});ref.set({name,on:true}).catch(e=>toast('Meedoen mislukt: '+(e?.code||'fout')));}
+ ref.onDisconnect().update({on:false});ref.set({name,on:true}).catch(e=>toast(tr('Meedoen mislukt: ','Joining failed: ')+(e?.code||'fout')));}
 function watchMyBid(){if(teacher||!state||state.round===myBidRound)return;if(myBidRef)myBidRef.off();myBidRound=state.round;
  if(!state.round)return;myBidRef=G.child('bids/'+state.round+'/'+uid);
- myBidRef.on('value',s=>{const v=s.val();const pl=state?.players?.[uid];if(v&&pl){draftKey=state.round+'|'+pl.role;draft={m:v.m||'ontladen',q:v.q,p:v.p};submittedFor=draftKey;lastSig='';schedule();}},()=>{});}
+ myBidRef.on('value',s=>{const v=s.val();const pl=state?.players?.[uid];if(v&&pl){draftKey=state.round+'|'+pl.role;draft={m:v.m||'ontladen',q:v.q,p:v.p,g:v.g??''};submittedFor=draftKey;lastSig='';schedule();}},()=>{});}
 
 /* hints voor seizoensdagen, afgeleid uit het scenario */
 function autoHint(pl,s,i){const r=pl.role,n=SCEN.length,last=i===n-1,sub=s.sub||0,kern=s.kern??s.therm??1,therm=s.therm??1,c=mc(r,s),pk=mc('piek',s),
  surplus=(s.load<=.5&&(s.wind>=.6||s.zon>=.8))||(sub&&s.load<=.5),tight=(s.load>=.9&&s.wind<=.3)||(kern===0&&s.load>=.85),gasUp=s.gas>1.05;
- if(r==='kern'){if(kern===0)return'Je centrale staat stil door de storing: je kunt deze ronde niets verkopen. Kijk wat het met de prijs doet.';
-  if(kern<1)return`Door het warme koelwater mag je maar ${Math.round(kern*100)}% leveren. Minder aanbod in de markt betekent vaak een hogere prijs.`;
-  if(surplus)return'Overschot verwacht: de prijs kan onder nul zakken. Onder 150 MW betaal je €3.000. Een negatief bod op je minimumlast kan goedkoper zijn dan afschakelen.';
-  if(tight)return'Krap uur: je wordt zeker afgenomen. Je krijgt de marktprijs, dus laag bieden kost je niets.';
-  if(gasUp)return'Duur gas betekent dat gascentrales een hoge prijs zetten. Jouw kosten blijven €12: verkoop alles.';
-  return'Bied je volle vermogen rond je kosten. Pay-as-clear: je krijgt de marktprijs, niet je bod.';}
- if(r==='wind'||r==='zon'){const f=r==='wind'?s.wind:s.zon;if(f<.02)return r==='zon'?'Geen zon: je hebt deze ronde geen vermogen.':'Windstil: je hebt deze ronde geen vermogen.';
-  if(sub)return`Je krijgt €${sub}/MWh subsidie bovenop de marktprijs. Zelfs bij een prijs van −€${sub-5} verdien je nog. Hoe laag durf je te bieden, als de anderen hetzelfde denken?`;
-  if(surplus)return'Veel gratis stroom op de markt: de prijs kan naar nul of lager zakken. Bepaal je ondergrens.';
-  if(f<.35)return'Weinig productie, maar wat je hebt, krijgt de marktprijs. Bied laag, dan draai je zeker.';
-  return'Je marginale kosten zijn nul en wat je niet verkoopt, is verloren. Bied laag en verkoop alles.';}
- if(r==='gas'){const cut=therm<1?` Je mag maar ${Math.round(therm*100)}% leveren door warm koelwater.`:'';
-  if(tight)return`Krap uur: je bent waarschijnlijk nodig. Je ruimte ligt tussen je eigen kosten (€${c}) en die van de piekcentrale (€${pk}).${cut}`;
-  if(surplus)return`Overschot: je bent waarschijnlijk niet nodig. Bied niet onder je kosten van €${c}.`;
-  if(gasUp)return`Door de dure gasprijs zijn je kosten €${c}/MWh. Pas je bod aan, anders verkoop je met verlies.${cut}`;
-  return`Bied rond je kosten (€${c}/MWh). Stijgt de vraag, dan bepaal jij vaak de prijs.${cut}`;}
- if(r==='piek'){if(tight||(therm<1&&s.load>=.9)||s.load>=1)return`Dit kan jouw uur zijn. Ben jij de laatste centrale die nodig is, dan bepaalt jouw bod de prijs voor iedereen. Bied je op je kosten (€${c}), dan verdien je niets. Hoe ver durf je erboven te gaan voordat afnemers afhaken?`;
-  if(surplus)return'Overschot: geen kans. Bied je kosten of sla over.';
-  return`Je bent alleen nodig als het krap wordt. Bied minimaal je kosten (€${c}). Ben je toch de laatste die nodig is, dan bepaalt jouw bod de prijs: een kleine marge kan dan lonen.`;}
- if(r==='bat'){if(last)return'Laatste ronde: lading die overblijft, levert niets op. Verkoop wat je nog hebt.';
-  if(surplus)return'Overschot verwacht: laad nu. Misschien word je zelfs betaald om stroom af te nemen.';
-  if(tight)return'Krapste moment: ontlaad, met een hoge minimumprijs.';
-  if(s.load>=.8)return'Hoge vraag: een goed moment om te ontladen.';
-  return'Gemiddeld uur. Laad als je verwacht dat het later duurder wordt; ontlaad als je nu een goede prijs verwacht.';}
- if(r==='lev'){if(surplus)return'Lage prijs verwacht: koop precies je vraag in. Bij een negatieve prijs word je betaald om in te kopen.';
-  if(tight)return'Krap uur: bied je te laag, dan krijg je niets en betaal je onbalans. Bied ruim.';
-  return'Dek je hele vraag met een ruime maximumprijs: je betaalt de marktprijs, niet je bod.';}
- if(r==='ind'){if(surplus)return'Goedkope stroom verwacht, misschien zelfs negatief geprijsd. Draai vol.';
-  if(tight||(gasUp&&s.load>=.85))return'De prijs komt waarschijnlijk boven €120. Stilstaan kan beter zijn dan verlies maken.';
-  return'Koop zolang de prijs onder je waarde van €120 blijft.';}
+ if(r==='kern'){if(kern===0)return tr('Je centrale staat stil door de storing: je kunt deze ronde niets verkopen. Kijk wat het met de prijs doet.','Your plant is down due to the outage: you cannot sell this round. Watch what it does to the price.');
+  if(kern<1)return tr(`Door het warme koelwater mag je maar ${Math.round(kern*100)}% leveren. Minder aanbod in de markt betekent vaak een hogere prijs.`,`Because the cooling water is too warm you may deliver only ${Math.round(kern*100)}%. Less supply in the market often means a higher price.`);
+  if(surplus)return tr('Overschot verwacht: de prijs kan onder nul zakken. Onder 150 MW betaal je €3.000. Een negatief bod op je minimumlast kan goedkoper zijn dan afschakelen.','Surplus expected: the price may drop below zero. Below 150 MW you pay €3,000. A negative bid on your minimum load can be cheaper than shutting down.');
+  if(tight)return tr('Krap uur: je wordt zeker afgenomen. Je krijgt de marktprijs, dus laag bieden kost je niets.','Tight hour: you will certainly be dispatched. You get the market price, so bidding low costs you nothing.');
+  if(gasUp)return tr('Duur gas betekent dat gascentrales een hoge prijs zetten. Jouw kosten blijven €12: verkoop alles.','Expensive gas means gas plants set a high price. Your costs stay €12: sell everything.');
+  return tr('Bied je volle vermogen rond je kosten. Pay-as-clear: je krijgt de marktprijs, niet je bod.','Offer your full capacity around your costs. Pay-as-clear: you get the market price, not your bid.');}
+ if(r==='wind'||r==='zon'){const f=r==='wind'?s.wind:s.zon;if(f<.02)return r==='zon'?tr('Geen zon: je hebt deze ronde geen vermogen. Doe wel mee met de prijsvoorspelling.','No sun: you have no capacity this round. Do join the price prediction.'):tr('Windstil: je hebt deze ronde geen vermogen. Doe wel mee met de prijsvoorspelling.','No wind: you have no capacity this round. Do join the price prediction.');
+  if(sub)return tr(`Je krijgt €${sub}/MWh subsidie bovenop de marktprijs. Zelfs bij een prijs van −€${sub-5} verdien je nog. Hoe laag durf je te bieden, als de anderen hetzelfde denken?`,`You receive a €${sub}/MWh subsidy on top of the market price. Even at a price of −€${sub-5} you still earn. How low dare you bid, if everyone else thinks the same?`);
+  if(surplus)return tr('Veel gratis stroom op de markt: de prijs kan naar nul of lager zakken. Bepaal je ondergrens.','Lots of free power on the market: the price may fall to zero or below. Decide your floor.');
+  if(f<.35)return tr('Weinig productie, maar wat je hebt, krijgt de marktprijs. Bied laag, dan draai je zeker.','Little production, but what you have gets the market price. Bid low so you are sure to run.');
+  return tr('Je marginale kosten zijn nul en wat je niet verkoopt, is verloren. Bied laag en verkoop alles.','Your marginal costs are zero and whatever you don’t sell is lost. Bid low and sell everything.');}
+ if(r==='gas'){const cut=therm<1?tr(` Je mag maar ${Math.round(therm*100)}% leveren door warm koelwater.`,` You may deliver only ${Math.round(therm*100)}% because of warm cooling water.`):'';
+  if(tight)return tr(`Krap uur: je bent waarschijnlijk nodig. Je ruimte ligt tussen je eigen kosten (€${c}) en die van de piekcentrale (€${pk}).`,`Tight hour: you are probably needed. Your room lies between your own costs (€${c}) and the peaker’s (€${pk}).`)+cut;
+  if(surplus)return tr(`Overschot: je bent waarschijnlijk niet nodig. Bied niet onder je kosten van €${c}.`,`Surplus: you are probably not needed. Don’t bid below your costs of €${c}.`);
+  if(gasUp)return tr(`Door de dure gasprijs zijn je kosten €${c}/MWh. Pas je bod aan, anders verkoop je met verlies.`,`Because of the high gas price your costs are €${c}/MWh. Adjust your bid or you will sell at a loss.`)+cut;
+  return tr(`Bied rond je kosten (€${c}/MWh). Stijgt de vraag, dan bepaal jij vaak de prijs.`,`Bid around your costs (€${c}/MWh). When demand rises, you often set the price.`)+cut;}
+ if(r==='piek'){if(tight||(therm<1&&s.load>=.9)||s.load>=1)return tr(`Dit kan jouw uur zijn. Ben jij de laatste centrale die nodig is, dan bepaalt jouw bod de prijs voor iedereen. Bied je op je kosten (€${c}), dan verdien je niets. Hoe ver durf je erboven te gaan voordat afnemers afhaken?`,`This could be your hour. If you are the last plant needed, your bid sets the price for everyone. Bid at cost (€${c}) and you earn nothing. How far above it dare you go before buyers drop out?`);
+  if(surplus)return tr('Overschot: geen kans. Bied je kosten of sla over, en doe mee met de prijsvoorspelling.','Surplus: no chance. Bid your costs or skip, and join the price prediction.');
+  return tr(`Je bent alleen nodig als het krap wordt. Bied minimaal je kosten (€${c}). Ben je toch de laatste die nodig is, dan bepaalt jouw bod de prijs: een kleine marge kan dan lonen.`,`You are only needed when supply gets tight. Bid at least your costs (€${c}). If you do turn out to be the last one needed, your bid sets the price: a small margin can pay off.`);}
+ if(r==='bat'){if(last)return tr('Laatste ronde: lading die overblijft, levert niets op. Verkoop wat je nog hebt.','Last round: any charge left over earns nothing. Sell what you have.');
+  if(surplus)return tr('Overschot verwacht: laad nu. Misschien word je zelfs betaald om stroom af te nemen.','Surplus expected: charge now. You may even get paid to take power.');
+  if(tight)return tr('Krapste moment: ontlaad, met een hoge minimumprijs.','Tightest moment: discharge, with a high minimum price.');
+  if(s.load>=.8)return tr('Hoge vraag: een goed moment om te ontladen.','High demand: a good moment to discharge.');
+  return tr('Gemiddeld uur. Laad als je verwacht dat het later duurder wordt; ontlaad als je nu een goede prijs verwacht.','Average hour. Charge if you expect prices to rise later; discharge if you expect a good price now.');}
+ if(r==='lev'){if(surplus)return tr('Lage prijs verwacht: koop precies je vraag in. Bij een negatieve prijs word je betaald om in te kopen.','Low price expected: buy exactly your demand. At a negative price you get paid to buy.');
+  if(tight)return tr('Krap uur: bied je te laag, dan krijg je niets en betaal je onbalans. Bied ruim.','Tight hour: bid too low and you get nothing and pay imbalance. Bid generously.');
+  return tr('Dek je hele vraag met een ruime maximumprijs: je betaalt de marktprijs, niet je bod.','Cover your full demand with a generous maximum price: you pay the market price, not your bid.');}
+ if(r==='ind'){if(surplus)return tr('Goedkope stroom verwacht, misschien zelfs negatief geprijsd. Draai vol.','Cheap power expected, maybe even negatively priced. Run at full capacity.');
+  if(tight||(gasUp&&s.load>=.85))return tr('De prijs komt waarschijnlijk boven €120. Stilstaan kan beter zijn dan verlies maken. Doe in elk geval mee met de prijsvoorspelling.','The price will probably exceed €120. Standing idle may beat making a loss. Either way, join the price prediction.');
+  return tr('Koop zolang de prijs onder je waarde van €120 blijft.','Buy as long as the price stays below your value of €120.');}
  const need=Math.max(0,EVNEED-(pl.chg||0)),left=n-i;
- if(need<=0)return'Je hebt al genoeg geladen. Laad alleen nog als de prijs ruim onder €250 ligt.';
- if(last)return`Laatste ronde: je mist nog ${num(need)} MWh, en elke MWh kost straks €400. Bied genoeg om zeker te laden.`;
- if(need>=left*150-1)return`Je moet elke resterende ronde vol laden om je ${num(need)} MWh te halen. Bied ruim.`;
- if(surplus)return'Goedkoop uur: laad vol.';
- if(tight)return`Duur uur. Je mist nog ${num(need)} MWh in ${left} rondes: kun je dit uur overslaan?`;
- return`Je mist nog ${num(need)} MWh in ${left} rondes. Plan je laden in de goedkoopste uren.`;}
+ if(need<=0)return tr('Je hebt al genoeg geladen. Laad alleen nog als de prijs ruim onder €250 ligt.','You have charged enough already. Only charge more if the price is well below €250.');
+ if(last)return tr(`Laatste ronde: je mist nog ${num(need)} MWh, en elke MWh kost straks €400. Bied genoeg om zeker te laden.`,`Last round: you are still ${num(need)} MWh short, and every MWh will cost €400. Bid enough to be sure you charge.`);
+ if(need>=left*150-1)return tr(`Je moet elke resterende ronde vol laden om je ${num(need)} MWh te halen. Bied ruim.`,`You must charge in full every remaining round to reach your ${num(need)} MWh. Bid generously.`);
+ if(surplus)return tr('Goedkoop uur: laad vol.','Cheap hour: charge in full.');
+ if(tight)return tr(`Duur uur. Je mist nog ${num(need)} MWh in ${left} rondes: kun je dit uur overslaan?`,`Expensive hour. You are ${num(need)} MWh short with ${left} rounds left: can you skip this hour?`);
+ return tr(`Je mist nog ${num(need)} MWh in ${left} rondes. Plan je laden in de goedkoopste uren.`,`You are ${num(need)} MWh short with ${left} rounds left. Plan your charging in the cheapest hours.`);}
 /* ---------- live scene (canvas) ---------- */
 const SKY={
  night:{top:'#03050f',bot:'#16204a',hill:'#070a18',stars:1,sun:0,sx:.8,sy:.2,sunc:'#ffffff',moon:1,clouds:.25,rain:0,storm:0,night:1},
@@ -466,67 +541,80 @@ function loop(now){if(!document.hidden)drawScene(now);if(!RM)requestAnimationFra
 if(RM)setInterval(()=>drawScene(performance.now()),2000);else requestAnimationFrame(loop);
 const BOLT='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l11-13h-6.8z" fill="#d4ff3a"/></svg>';
 let heroLast='';function setHero(html){if(html!==heroLast){heroLast=html;$('#heroIn').innerHTML=html;}}
-function chips(s){const k=s.kern??s.therm??1;return`<div class="chips"><span>Vraag <b>${Math.round(s.load*100)}%</b></span><span>Wind <b>${Math.round(s.wind*100)}%</b></span><span>Zon <b>${Math.round(s.zon*100)}%</b></span><span>Gas <b>${s.gas>1.001?'+'+Math.round((s.gas-1)*100)+'%':'normaal'}</b></span>${k<1?`<span>Kern <b>${Math.round(k*100)}%</b></span>`:''}${(s.therm??1)<1?`<span>Gas- en piekcentrales <b>${Math.round(s.therm*100)}%</b></span>`:''}${s.sub?`<span>Subsidie wind/zon <b>€${s.sub}</b></span>`:''}</div>`;}
+function chips(s){const k=s.kern??s.therm??1;return`<div class="chips"><span>${tr('Vraag','Demand')} <b>${Math.round(s.load*100)}%</b></span><span>Wind <b>${Math.round(s.wind*100)}%</b></span><span>${tr('Zon','Sun')} <b>${Math.round(s.zon*100)}%</b></span><span>Gas <b>${s.gas>1.001?'+'+Math.round((s.gas-1)*100)+'%':tr('normaal','normal')}</b></span>${k<1?`<span>${tr('Kern','Nuclear')} <b>${Math.round(k*100)}%</b></span>`:''}${(s.therm??1)<1?`<span>${tr('Gas- en piekcentrales','Gas and peaker plants')} <b>${Math.round(s.therm*100)}%</b></span>`:''}${s.sub?`<span>${tr('Subsidie wind/zon','Wind/solar subsidy')} <b>€${s.sub}</b></span>`:''}</div>`;}
 function countUp(el,to){if(!el)return;if(RM||to==null){el.textContent=to==null?'—':eur(to);return;}const t0=performance.now(),from=0;
  const st=n=>{const k=Math.min(1,(n-t0)/900),e=1-(1-k)**3;el.textContent=eur(from+(to-from)*e);if(k<1)requestAnimationFrame(st);};requestAnimationFrame(st);}
 let lastCount=-1,lastMO=-1;
 
 /* ---------- rendering ---------- */
 let raf=0;function schedule(){if(!raf)raf=requestAnimationFrame(()=>{raf=0;render();});}
-function render(){teacher?renderTeacher():renderStudent();}
+function render(){document.documentElement.lang=LANG;teacher?renderTeacher():renderStudent();}
+const sn=s=>tr(s.n,s.ne),sev=s=>tr(s.ev,s.ee),seasN=k=>tr(SEASONS[k].n,SEASONS[k].ne),seasD=k=>tr(SEASONS[k].d,SEASONS[k].de);
+const langSw=()=>`<div class="lang" role="group" aria-label="Taal / Language"><button data-lang="nl" class="${LANG==='nl'?'on':''}" aria-pressed="${LANG==='nl'}">NL</button><button data-lang="en" class="${LANG==='en'?'on':''}" aria-pressed="${LANG==='en'}">EN</button></div>`;
 const sorted=()=>Object.entries(state?.players||{}).sort((a,b)=>b[1].tot-a[1].tot);
-function leaderboard(n){const L=sorted().slice(0,n);if(!L.length)return'<p class="mute">Nog geen spelers.</p>';
- return'<div class="lb">'+L.map(([k,p],i)=>`<div><span class="mute">${i+1}</span><i class="dot" style="background:${ROLES[p.role].col}"></i><em>${esc(p.name)} <span class="mute small">${ROLES[p.role].n}</span></em><b class="${p.tot<0?'neg':''}">${eur(p.tot)}</b></div>`).join('')+'</div>';}
-function history(){const h=(state.hist||[]).map(hv);if(!h.length)return'<p class="mute small">Nog geen marktuitslagen.</p>';const mx=Math.max(50,...h.map(v=>Math.abs(v??0)));
- return'<div class="hist">'+h.map((v,i)=>`<div><span class="mute">${SCEN[i].t}</span><i class="${(v??0)<0?'neg':''}" style="width:${Math.max(2,Math.abs(v??0)/mx*100)}%"></i><span>${v==null?'geen handel':eur(v)}</span></div>`).join('')+'</div>';}
-function scenCard(s){return`<div class="card stack-v"><div class="row between"><h2>${s.t} · ${esc(s.n)}</h2><span class="timer" id="timer"></span></div><p class="event">${esc(s.ev)}</p>
- <div class="kv"><span>Vraag</span><div class="meter"><i style="width:${s.load*100}%"></i></div><span>${Math.round(s.load*100)}%</span>
- <span>Wind</span><div class="meter"><i style="width:${s.wind*100}%;background:${ROLES.wind.col}"></i></div><span>${Math.round(s.wind*100)}%</span>
- <span>Zon</span><div class="meter"><i style="width:${s.zon*100}%;background:${ROLES.zon.col}"></i></div><span>${Math.round(s.zon*100)}%</span>
- <span>Gasprijs</span><div class="meter"><i style="width:${s.gas/1.6*100}%;background:${ROLES.gas.col}"></i></div><span>${s.gas>1?'+60%':'normaal'}</span></div></div>`;}
+const dotc=r=>`<i class="dot" style="background:${ROLES[r].col}"></i>`;
+function leaderboard(n){const L=sorted().slice(0,n);if(!L.length)return`<p class="mute">${tr('Nog geen spelers.','No players yet.')}</p>`;
+ return'<div class="lb">'+L.map(([k,p],i)=>`<div><span class="mute">${i+1}</span>${dotc(p.role)}<em>${esc(pname(p))} <span class="mute small">${rn(p.role)}</span></em><b class="${p.tot<0?'neg':''}">${eur(p.tot)}</b></div>`).join('')+'</div>';}
+function predBoard(n){const L=Object.entries(state?.players||{}).filter(([,p])=>!p.bot&&(p.gp||0)>0).sort((a,b)=>(b[1].gp||0)-(a[1].gp||0)).slice(0,n);
+ if(!L.length)return`<p class="mute small">${tr('Nog geen voorspellingen. Studenten kunnen elke ronde de marktprijs voorspellen.','No predictions yet. Students can predict the market price every round.')}</p>`;
+ return'<div class="lb">'+L.map(([k,p],i)=>`<div><span class="mute">${i+1}</span>${dotc(p.role)}<em>${esc(pname(p))}</em><b>${num(p.gp)} ${tr('pt','pts')}</b></div>`).join('')+'</div>';}
+function roundPreds(){const r=state.result?.round,P=state.result?.P;if(!r||P==null)return'';
+ const L=Object.entries(state.players).filter(([,p])=>p.last&&p.last.r===r&&p.last.g!=null).sort((a,b)=>Math.abs(a[1].last.g-P)-Math.abs(b[1].last.g-P)).slice(0,5);
+ if(!L.length)return'';
+ return`<div class="card stack-v"><h3>${tr('Dichtstbij voorspeld','Closest predictions')}</h3><div class="lb">${L.map(([k,p],i)=>`<div><span class="mute">${i+1}</span>${dotc(p.role)}<em>${esc(pname(p))} <span class="mute small">${eur(p.last.g)}</span></em><b>+${num(p.last.gp||0)}</b></div>`).join('')}</div></div>`;}
+function history(){const h=(state.hist||[]).map(hv);if(!h.length)return`<p class="mute small">${tr('Nog geen marktuitslagen.','No market results yet.')}</p>`;const mx=Math.max(50,...h.map(v=>Math.abs(v??0)));
+ return'<div class="hist">'+h.map((v,i)=>`<div><span class="mute">${SCEN[i].t}</span><i class="${(v??0)<0?'neg':''}" style="width:${Math.max(2,Math.abs(v??0)/mx*100)}%"></i><span>${v==null?tr('geen handel','no trade'):eur(v)}</span></div>`).join('')+'</div>';}
+function noteTxt(L){const n=L?.note;if(!n)return'';if(typeof n==='string')return n;
+ if(n.k==='bat')return tr('Laadtoestand nu ','State of charge now ')+num(n.v)+' MWh';
+ if(n.k==='short')return tr(`Tekort ${num(n.sh)} MW tegen onbalansprijs ${eur(n.imb)}/MWh`,`Shortfall of ${num(n.sh)} MW at imbalance price ${eur(n.imb)}/MWh`);
+ if(n.k==='ev')return tr(`Vandaag geladen: ${num(n.v)} van ${EVNEED} MWh`,`Charged today: ${num(n.v)} of ${EVNEED} MWh`);
+ if(n.k==='minrun')return tr('Onder de minimumlast: €3.000 extra kosten','Below minimum load: €3,000 extra costs');return'';}
 
 function renderTeacher(){const app=$('#app');if(!loaded){return;}
- if(!state){app.innerHTML='<div class="wrap"><p class="mute pulse">Markt aanmaken…</p></div>';return;}
+ if(!state){app.innerHTML=`<div class="wrap"><p class="mute pulse">${tr('Markt aanmaken…','Creating market…')}</p></div>`;return;}
  const ph=state.phase,s=SCEN[Math.max(0,state.round-1)],np=Object.keys(state.players).length;
  let btn='';
- if(ph==='lobby')btn=`<button class="acc" data-a="start" ${np<2?'disabled':''}>Start de handelsdag</button>`;
- else if(ph==='bid')btn=`<button class="ghost" data-a="t60">Timer 60 s</button><button class="ghost" data-a="t90">90 s</button><button class="px" data-a="close">Sluit markt en bereken</button>`;
- else if(ph==='res')btn=`<button class="acc" data-a="next">${state.round>=SCEN.length?'Bekijk eindstand':'Volgende ronde'}</button>`;
- const hintBtn=ph!=='end'?`<button class="ghost" data-a="hints" aria-pressed="${state.hints!==false}">Hints ${state.hints!==false?'aan':'uit'}</button>`:'';
- const reset=`<button class="ghost" data-a="reset">${confirmReset?'Zeker weten? Klik nogmaals':'Nieuw spel'}</button>`;
+ if(ph==='lobby')btn=`<button class="acc" data-a="start" ${np<2?'disabled':''}>${tr('Start de handelsdag','Start trading day')}</button>`;
+ else if(ph==='bid')btn=`<button class="ghost" data-a="t60">Timer 60 s</button><button class="ghost" data-a="t90">90 s</button><button class="px" data-a="close">${tr('Sluit markt en bereken','Close market and clear')}</button>`;
+ else if(ph==='res')btn=`<button class="acc" data-a="next">${state.round>=SCEN.length?tr('Bekijk eindstand','Show final ranking'):tr('Volgende ronde','Next round')}</button>`;
+ const hintBtn=ph!=='end'?`<button class="ghost" data-a="hints" aria-pressed="${state.hints!==false}">${state.hints!==false?tr('Hints aan','Hints on'):tr('Hints uit','Hints off')}</button>`:'';
+ const reset=`<button class="ghost" data-a="reset">${confirmReset?tr('Zeker weten? Klik nogmaals','Are you sure? Click again'):tr('Nieuw spel','New game')}</button>`;
  document.body.dataset.view='teacher';setScene(ph==='bid'||ph==='res'?state.round-1:0,{show:ph==='lobby'||ph==='end',party:ph==='end'});
- let hm;if(ph==='lobby')hm=`<div><p class="eyebrow">DAY-AHEAD MARKT · PAY-AS-CLEAR</p><h1 class="clock" style="font-size:clamp(40px,6.5vw,88px)">${SEASON==='standaard'?'Handelsdag':esc(SEASONS[SEASON].n+'dag')}</h1><p class="scen">${np} ${np===1?'speler':'spelers'} · spelcode ${esc(code)}</p></div>`;
- else if(ph==='end'){const w=byPct()[0];hm=`<div><p class="eyebrow">EINDE HANDELSDAG · WINNAAR</p><h1 class="clock" style="font-size:clamp(40px,6.5vw,88px)">${w?esc(w[1].name):'—'}</h1><p class="scen">${w&&w[1].pct!=null?pctTxt(w[1].pct)+' van het verdienpotentieel':''}</p></div>`;}
- else hm=`<div><p class="eyebrow">${SEASON==='standaard'?'':esc(SEASONS[SEASON].n.toUpperCase())+' · '}RONDE ${state.round} VAN ${SCEN.length} · SPELCODE ${esc(code)}</p><div class="clock">${s.t}</div><p class="scen">${esc(s.n)}</p><p class="ev">${esc(s.ev)}</p>${chips(s)}</div><div class="timer" id="timer"></div>`;
- setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div><div class="row">${btn}${hintBtn}${reset}</div></div><div class="hero-main">${hm}</div>`);
- const head='';
+ const big='style="font-size:clamp(40px,6.5vw,88px)"';let hm;
+ if(ph==='lobby')hm=`<div><p class="eyebrow">${tr('DAY-AHEAD MARKT · PAY-AS-CLEAR','DAY-AHEAD MARKET · PAY-AS-CLEAR')}</p><h1 class="clock" ${big}>${SEASON==='standaard'?tr('Handelsdag','Trading day'):esc(tr(SEASONS[SEASON].n+'dag',SEASONS[SEASON].ne+' day'))}</h1><p class="scen">${np} ${np===1?tr('speler','player'):tr('spelers','players')} · ${tr('spelcode','game code')} ${esc(code)}</p></div>`;
+ else if(ph==='end'){const w=byPct()[0];hm=`<div><p class="eyebrow">${tr('EINDE HANDELSDAG · WINNAAR','END OF TRADING DAY · WINNER')}</p><h1 class="clock" ${big}>${w?esc(pname(w[1])):'—'}</h1><p class="scen">${w&&w[1].pct!=null?pctTxt(w[1].pct)+tr(' van het verdienpotentieel',' of earning potential'):''}</p></div>`;}
+ else hm=`<div><p class="eyebrow">${SEASON==='standaard'?'':esc(seasN(SEASON).toUpperCase())+' · '}${tr('RONDE','ROUND')} ${state.round} ${tr('VAN','OF')} ${SCEN.length} · ${tr('SPELCODE','GAME CODE')} ${esc(code)}</p><div class="clock">${s.t}</div><p class="scen">${esc(sn(s))}</p><p class="ev">${esc(sev(s))}</p>${chips(s)}</div><div class="timer" id="timer"></div>`;
+ setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div><div class="row">${btn}${hintBtn}${reset}${langSw()}</div></div><div class="hero-main">${hm}</div>`);
+ const legend=`<div class="legend">${ORDER.map(r=>`<span class="row">${dotc(r)}${rn(r)}</span>`).join('')}</div>`;
  let body='';
- if(ph==='lobby'){
-  body=`<div class="grid"><div class="card stack-v"><h2>Spelers en rollen</h2><p class="mute small">Studenten scannen de QR-code, of gaan naar de link en vullen code ${esc(code)} in. Daarna kiezen ze een naam. Ze krijgen automatisch een rol in een vaste volgorde, zodat vraag en aanbod in balans blijven. Tik op een rol om die te wijzigen.</p>
-   <div class="players">${Object.entries(state.players).map(([k,p])=>`<div class="pl"><i class="dot" style="background:${p.bot||presenceOf(k)?.on?'var(--ok)':'var(--line)'}"></i><div style="flex:1"><b>${esc(p.name)}</b><button class="rolebtn" data-role="${esc(k)}"><i class="dot" style="background:${ROLES[p.role].col}"></i> ${ROLES[p.role].n}</button></div><button class="x" data-del="${esc(k)}" aria-label="Verwijder">×</button></div>`).join('')||'<p class="mute">Nog niemand binnen. Laat studenten de QR-code scannen.</p>'}</div>
-   <div class="stack-v"><h3>Speldag</h3><div class="seasons">${Object.entries(SEASONS).map(([k,v])=>`<button class="season ${SEASON===k?'on':''}" data-season="${k}" aria-pressed="${SEASON===k}"><b>${v.n}</b><span>${v.d}</span></button>`).join('')}</div></div>
-   <div class="row"><button class="ghost" data-a="bots" ${missingRoles().length?'':'disabled'}>Aanvullen met bots${missingRoles().length?' ('+missingRoles().length+')':''}</button><span class="mute small">${missingRoles().length?'Voegt alleen bots toe voor rollen zonder speler.':'Alle rollen zijn bezet.'}</span></div></div>
-   <div class="stack-v"><div class="card stack-v" style="text-align:center"><p class="eyebrow" style="margin:0">SCAN OM MEE TE DOEN</p><div class="qrbox" id="qr"></div><div class="code">${esc(code)}</div><p class="small" style="overflow-wrap:anywhere">${esc(joinUrl())}</p></div><div class="card stack-v"><h2>Zo werkt het</h2><p>Elke ronde is één uur van de dag. Producenten bieden volume en een minimumprijs, afnemers volume en een maximumprijs. De markt sorteert alle biedingen in de merit order en de duurste nog benodigde eenheid bepaalt de prijs voor iedereen.</p><p class="mute small">Zes rondes: ${SCEN.map(x=>x.t+' '+x.n.toLowerCase()).join(', ')}.</p></div>
-   <div class="card"><h3>Rollen</h3><div class="legend">${ORDER.map(r=>`<span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span>`).join('')}</div></div></div></div>`;
+ if(ph==='lobby'){const miss=missingRoles().length;
+  body=`<div class="grid"><div class="card stack-v"><h2>${tr('Spelers en rollen','Players and roles')}</h2><p class="mute small">${tr(`Studenten scannen de QR-code, of gaan naar de link en vullen code ${esc(code)} in. Daarna kiezen ze een naam. Ze krijgen automatisch een rol in een vaste volgorde, zodat vraag en aanbod in balans blijven. Tik op een rol om die te wijzigen.`,`Students scan the QR code, or go to the link and enter code ${esc(code)}. Then they choose a name. Roles are assigned automatically in a fixed order so supply and demand stay balanced. Tap a role to change it.`)}</p>
+   <div class="players">${Object.entries(state.players).map(([k,p])=>`<div class="pl"><i class="dot" style="background:${p.bot||presenceOf(k)?.on?'var(--ok)':'var(--line)'}"></i><div style="flex:1"><b>${esc(pname(p))}</b><button class="rolebtn" data-role="${esc(k)}">${dotc(p.role)} ${rn(p.role)}</button></div><button class="x" data-del="${esc(k)}" aria-label="${tr('Verwijder','Remove')}">×</button></div>`).join('')||`<p class="mute">${tr('Nog niemand binnen. Laat studenten de QR-code scannen.','Nobody here yet. Have students scan the QR code.')}</p>`}</div>
+   <div class="stack-v"><h3>${tr('Speldag','Game day')}</h3><div class="seasons">${Object.keys(SEASONS).map(k=>`<button class="season ${SEASON===k?'on':''}" data-season="${k}" aria-pressed="${SEASON===k}"><b>${seasN(k)}</b><span>${seasD(k)}</span></button>`).join('')}</div></div>
+   <div class="row"><button class="ghost" data-a="bots" ${miss?'':'disabled'}>${tr('Aanvullen met bots','Fill up with bots')}${miss?' ('+miss+')':''}</button><span class="mute small">${miss?tr('Voegt alleen bots toe voor rollen zonder speler.','Only adds bots for roles without a player.'):tr('Alle rollen zijn bezet.','All roles are taken.')}</span></div></div>
+   <div class="stack-v"><div class="card stack-v" style="text-align:center"><p class="eyebrow" style="margin:0">${tr('SCAN OM MEE TE DOEN','SCAN TO JOIN')}</p><div class="qrbox" id="qr"></div><div class="code">${esc(code)}</div><p class="small" style="overflow-wrap:anywhere">${esc(joinUrl())}</p></div><div class="card stack-v"><h2>${tr('Zo werkt het','How it works')}</h2><p>${tr('Elke ronde is één uur van de dag. Producenten bieden volume en een minimumprijs, afnemers volume en een maximumprijs. De markt sorteert alle biedingen in de merit order en de duurste nog benodigde eenheid bepaalt de prijs voor iedereen. Daarnaast voorspelt iedereen de marktprijs.','Each round is one hour of the day. Producers bid a volume and a minimum price, buyers a volume and a maximum price. The market sorts all bids into the merit order and the most expensive unit still needed sets the price for everyone. Everyone also predicts the market price.')}</p><p class="mute small">${tr('Zes rondes','Six rounds')}: ${SCEN.map(x=>x.t+' '+sn(x).toLowerCase()).join(', ')}.</p></div>
+   <div class="card"><h3>${tr('Rollen','Roles')}</h3>${legend}</div></div></div>`;
  }else if(ph==='end'){
-  body=`<div class="grid"><div class="card stack-v"><h2>Eindstand: % van verdienpotentieel</h2><p class="mute small">Verdienpotentieel = wat je met jouw installatie had kunnen verdienen als je alle prijzen van vandaag vooraf had gekend. Boven 100%: je hebt de prijs in je voordeel beïnvloed. Leveranciers worden gescoord op inkoopkosten (ideaal ÷ werkelijk).</p>
-   <div class="lb">${byPct().map(([k,p],i)=>`<div><span class="mute">${i+1}</span><i class="dot" style="background:${ROLES[p.role].col}"></i><em>${esc(p.name)} <span class="mute small">${ROLES[p.role].n} · ${potTxt(p)}</span></em><b class="${(p.pct??0)<50?'neg':''}">${p.pct==null?'—':pctTxt(p.pct)}</b></div>`).join('')}</div>
-   ${sorted().some(([,p])=>p.pen)?'<p class="mute small">Laadplein-exploitanten zijn gecorrigeerd voor niet-geladen energie (€400/MWh).</p>':''}</div>
-   <div class="stack-v"><div class="card stack-v"><h2>Prijsverloop van de dag</h2>${history()}</div><div class="card stack-v"><h2>Beste per rol</h2>${ORDER.map(r=>{const b=byPct().find(([,p])=>p.role===r);return b?`<div class="row between"><span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span><span>${esc(b[1].name)} · <b>${b[1].pct==null?'—':pctTxt(b[1].pct)}</b></span></div>`:''}).join('')}</div><div class="card stack-v"><h2>Hoogste euroresultaat</h2>${leaderboard(5)}</div></div></div>`;
+  body=`<div class="grid"><div class="card stack-v"><h2>${tr('Eindstand: % van verdienpotentieel','Final ranking: % of earning potential')}</h2><p class="mute small">${tr('Verdienpotentieel = wat je met jouw installatie had kunnen verdienen als je alle prijzen van vandaag vooraf had gekend. Boven 100%: je hebt de prijs in je voordeel beïnvloed. Leveranciers worden gescoord op inkoopkosten (ideaal ÷ werkelijk).','Earning potential = what your asset could have earned had you known all of today’s prices in advance. Above 100%: you moved the price in your favour. Retailers are scored on purchase costs (ideal ÷ actual).')}</p>
+   <div class="lb">${byPct().map(([k,p],i)=>`<div><span class="mute">${i+1}</span>${dotc(p.role)}<em>${esc(pname(p))} <span class="mute small">${rn(p.role)} · ${potTxt(p)}</span></em><b class="${(p.pct??0)<50?'neg':''}">${p.pct==null?'—':pctTxt(p.pct)}</b></div>`).join('')}</div>
+   ${sorted().some(([,p])=>p.pen)?`<p class="mute small">${tr('Laadplein-exploitanten zijn gecorrigeerd voor niet-geladen energie (€400/MWh).','Charging hub operators are corrected for energy not charged (€400/MWh).')}</p>`:''}</div>
+   <div class="stack-v"><div class="card stack-v"><h2>${tr('Prijsverloop van de dag','Prices over the day')}</h2>${history()}</div><div class="card stack-v"><h2>${tr('Beste voorspellers','Best forecasters')}</h2>${predBoard(5)}</div><div class="card stack-v"><h2>${tr('Beste per rol','Best per role')}</h2>${ORDER.map(r=>{const b=byPct().find(([,p])=>p.role===r);return b?`<div class="row between"><span class="row">${dotc(r)}${rn(r)}</span><span>${esc(pname(b[1]))} · <b>${b[1].pct==null?'—':pctTxt(b[1].pct)}</b></span></div>`:''}).join('')}</div><div class="card stack-v"><h2>${tr('Hoogste euroresultaat','Highest euro result')}</h2>${leaderboard(5)}</div></div></div>`;
  }else{
   const res=state.result,showRes=ph==='res'&&res;
-  const inn=Object.entries(state.players).map(([k,p])=>{const on=p.bot||!!bidOf(k);return`<span class="chip ${on?'on':''}"><i class="dot" style="background:${ROLES[p.role].col}"></i>${esc(p.name)}</span>`;}).join('');
+  const inn=Object.entries(state.players).map(([k,p])=>{const on=p.bot||!!bidOf(k);return`<span class="chip ${on?'on':''}">${dotc(p.role)}${esc(pname(p))}</span>`;}).join('');
   const nIn=Object.entries(state.players).filter(([k,p])=>p.bot||bidOf(k)).length;
   body=`<div class="grid"><div class="card stack-v">
-   <div class="row between"><div><h2>${showRes?'Merit order '+SCEN[res.round-1].t:res?'Vorige ronde: '+SCEN[res.round-1].t:'Merit order'}</h2><p class="mute small">Staven = aanbod (ondoorzichtig deel is verkocht), lijn = vraag</p></div>
-   ${res?`<div style="text-align:right"><div class="big" id="price">${res.P==null?'—':eur(res.P)}</div><div class="mute small">per MWh · ${num(res.V)} MW verhandeld</div></div>`:''}</div>
-   <div class="fig"><svg id="mo" role="img" aria-label="Merit order: aanbod- en vraagcurve met marktprijs"></svg>${res?'':'<p class="mute" style="position:absolute;inset:auto 0 45% 0;text-align:center">De grafiek verschijnt zodra je de eerste markt sluit.</p>'}</div>
-   <div class="legend">${ORDER.map(r=>`<span class="row"><i class="dot" style="background:${ROLES[r].col}"></i>${ROLES[r].n}</span>`).join('')}</div></div>
+   <div class="row between"><div><h2>${showRes?'Merit order '+SCEN[res.round-1].t:res?tr('Vorige ronde: ','Previous round: ')+SCEN[res.round-1].t:'Merit order'}</h2><p class="mute small">${tr('Staven = aanbod (ondoorzichtig deel is verkocht), lijn = vraag','Bars = supply (solid part is sold), line = demand')}</p></div>
+   ${res?`<div style="text-align:right"><div class="big" id="price">${res.P==null?'—':eur(res.P)}</div><div class="mute small">${tr('per MWh','per MWh')} · ${num(res.V)} MW ${tr('verhandeld','traded')}</div></div>`:''}</div>
+   <div class="fig"><svg id="mo" role="img" aria-label="${tr('Merit order: aanbod- en vraagcurve met marktprijs','Merit order: supply and demand curves with market price')}"></svg>${res?'':`<p class="mute" style="position:absolute;inset:auto 0 45% 0;text-align:center">${tr('De grafiek verschijnt zodra je de eerste markt sluit.','The chart appears once you close the first market.')}</p>`}</div>
+   ${legend}</div>
    <div class="stack-v">
-   ${ph==='bid'?`<div class="card stack-v"><div class="row between"><h3>Biedingen binnen</h3><b>${nIn}/${np}</b></div><div class="row">${inn}</div><p class="mute small">Studenten kunnen hun bod aanpassen tot je de markt sluit. Wie niet biedt, handelt niet.</p></div>`:''}
-   <div class="card stack-v"><h3>Ranglijst</h3>${leaderboard(8)}</div>
-   <div class="card stack-v"><h3>Prijzen vandaag</h3>${history()}</div></div></div>`;}
- app.innerHTML=`<div class="wrap">${head}${body}</div>`;
+   ${ph==='bid'?`<div class="card stack-v"><div class="row between"><h3>${tr('Biedingen binnen','Bids received')}</h3><b>${nIn}/${np}</b></div><div class="row">${inn}</div><p class="mute small">${tr('Studenten kunnen hun bod aanpassen tot je de markt sluit. Wie niet biedt, handelt niet.','Students can change their bid until you close the market. No bid means no trade.')}</p></div>`:''}
+   ${showRes?roundPreds():''}
+   <div class="card stack-v"><h3>${tr('Ranglijst','Ranking')}</h3>${leaderboard(8)}</div>
+   <div class="card stack-v"><h3>${tr('Beste voorspellers','Best forecasters')}</h3>${predBoard(5)}</div>
+   <div class="card stack-v"><h3>${tr('Prijzen vandaag','Prices today')}</h3>${history()}</div></div></div>`;}
+ app.innerHTML=`<div class="wrap">${body}</div>`;
  const qr=$('#qr');if(qr&&window.QRCode){try{new QRCode(qr,{text:joinUrl(),width:220,height:220,correctLevel:QRCode.CorrectLevel.M});}catch(e){}}
  const svg=$('#mo');if(svg&&state.result){const anim=state.result.round!==lastMO;lastMO=state.result.round;moRO.disconnect();moRO.observe(svg);drawMO(svg,state.result,anim);}
  if(ph==='res'&&state.result&&state.result.round!==lastCount){lastCount=state.result.round;countUp($('#price'),state.result.P);}
@@ -559,61 +647,68 @@ setInterval(tick,500);
 function renderStudent(){const app=$('#app');
  const pl=state?.players?.[me.key],ph=state?.phase,s=SCEN[Math.max(0,(state?.round||1)-1)];
  document.body.dataset.view='student';const live=pl&&(ph==='bid'||ph==='res');setScene(live?state.round-1:0,{show:!live,party:ph==='end'});
- setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div><span class="chips" style="margin:0"><span>spel <b>${esc(code)}</b></span></span></div><div class="hero-main">${live?`<div><p class="eyebrow">RONDE ${state.round} VAN ${SCEN.length}</p><div class="clock">${s.t}</div><p class="scen">${esc(s.n)}</p></div><div class="timer" id="timer"></div>`:ph==='end'&&pl?`<div><p class="eyebrow">EINDE HANDELSDAG</p><div class="clock" style="font-size:40px">${pl.pct!=null?pctTxt(pl.pct):'Klaar'}</div><p class="scen">van je verdienpotentieel</p></div>`:`<div><p class="eyebrow">DAY-AHEAD MARKT</p><div class="clock" style="font-size:40px">Handel mee</div></div>`}</div>`);
- const sig=[!!me.name,!!pl,pl?.role,ph,state?.round,JSON.stringify(pl?.last),pl?.tot,submittedFor].join('|');
+ setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div><div class="row"><span class="chips" style="margin:0"><span>${tr('spel','game')} <b>${esc(code)}</b></span></span>${langSw()}</div></div><div class="hero-main">${live?`<div><p class="eyebrow">${tr('RONDE','ROUND')} ${state.round} ${tr('VAN','OF')} ${SCEN.length}</p><div class="clock">${s.t}</div><p class="scen">${esc(sn(s))}</p></div><div class="timer" id="timer"></div>`:ph==='end'&&pl?`<div><p class="eyebrow">${tr('EINDE HANDELSDAG','END OF TRADING DAY')}</p><div class="clock" style="font-size:40px">${pl.pct!=null?pctTxt(pl.pct):tr('Klaar','Done')}</div><p class="scen">${tr('van je verdienpotentieel','of your earning potential')}</p></div>`:`<div><p class="eyebrow">${tr('DAY-AHEAD MARKT','DAY-AHEAD MARKET')}</p><div class="clock" style="font-size:40px">${tr('Handel mee','Start trading')}</div></div>`}</div>`);
+ const sig=[LANG,!!me.name,!!pl,pl?.role,ph,state?.round,JSON.stringify(pl?.last),pl?.tot,pl?.gp,submittedFor].join('|');
  if(sig===lastSig){updStudent();return;}lastSig=sig;
- if(!me.name){app.innerHTML=`<div class="phone stack-v"><p class="mute">Spel ${esc(code)} · handel mee op de day-ahead markt voor elektriciteit.</p>
-  <form class="card stack-v" id="join"><div><label for="nm">Je naam of teamnaam</label><input id="nm" maxlength="24" autocomplete="nickname" required></div><button class="acc" type="submit">Meedoen</button></form></div>`;
+ if(!me.name){app.innerHTML=`<div class="phone stack-v"><p class="mute">${tr(`Spel ${esc(code)} · handel mee op de day-ahead markt voor elektriciteit.`,`Game ${esc(code)} · trade on the day-ahead electricity market.`)}</p>
+  <form class="card stack-v" id="join"><div><label for="nm">${tr('Je naam of teamnaam','Your name or team name')}</label><input id="nm" maxlength="24" autocomplete="nickname" required></div><button class="acc" type="submit">${tr('Meedoen','Join')}</button></form></div>`;
   $('#join').addEventListener('submit',e=>{e.preventDefault();const v=$('#nm').value.trim().slice(0,24);if(!v)return;join(v);render();});return;}
- if(!pl){app.innerHTML=`<div class="phone stack-v"><div class="card"><p><b>Hoi ${esc(me.name)}!</b></p><p class="mute pulse">Wachten tot de docent je een rol geeft…</p></div></div>`;return;}
+ if(!pl){app.innerHTML=`<div class="phone stack-v"><div class="card"><p><b>${tr('Hoi','Hi')} ${esc(me.name)}!</b></p><p class="mute pulse">${tr('Wachten tot de docent je een rol geeft…','Waiting for the teacher to assign you a role…')}</p></div></div>`;return;}
  const R=ROLES[pl.role];const rank=(ph==='end'?byPct():sorted()).findIndex(([k])=>k===me.key)+1,n=Object.keys(state.players).length;
  let mid='';
- if(ph==='lobby')mid=`<div class="card"><p><b>Wacht tot de docent de handelsdag start.</b></p><p class="mute">Lees intussen je rol goed door.</p></div>`;
+ if(ph==='lobby')mid=`<div class="card"><p><b>${tr('Wacht tot de docent de handelsdag start.','Wait for the teacher to start the trading day.')}</b></p><p class="mute">${tr('Lees intussen je rol goed door.','Meanwhile, read your role carefully.')}</p></div>`;
  else if(ph==='bid')mid=bidForm(pl,s);
  else if(ph==='res'||ph==='end')mid=resultCard(pl,ph==='end');
  app.innerHTML=`<div class="phone stack-v">
-  <div class="rolecard" style="--rc:${R.col}"><svg viewBox="0 0 120 120" aria-hidden="true">${ICON[pl.role]}</svg><p class="eyebrow" style="color:var(--rc)">${esc(pl.name).toUpperCase()}</p><h2>${R.n}</h2><p style="max-width:88%;margin-top:10px">${R.tip}</p></div>
+  <div class="rolecard" style="--rc:${R.col}"><svg viewBox="0 0 120 120" aria-hidden="true">${ICON[pl.role]}</svg><p class="eyebrow" style="color:var(--rc)">${esc(pl.name).toUpperCase()}</p><h2>${rn(pl.role)}</h2><p style="max-width:88%;margin-top:10px">${rtip(pl.role)}</p></div>
   ${mid}
-  <div class="card"><div class="resline"><span>Totaal resultaat</span><b class="${pl.tot<0?'neg':'pos'}">${eur(pl.tot)}</b></div><div class="resline" style="border:0"><span>Positie</span><b>${rank} van ${n}</b></div></div></div>`;
+  <div class="card"><div class="resline"><span>${tr('Totaal resultaat','Total result')}</span><b class="${pl.tot<0?'neg':'pos'}">${eur(pl.tot)}</b></div><div class="resline"><span>${tr('Positie','Position')}</span><b>${rank} ${tr('van','of')} ${n}</b></div><div class="resline" style="border:0"><span>${tr('Voorspelpunten','Prediction points')}</span><b>${num(pl.gp||0)}</b></div></div></div>`;
  bindForm(pl,s);const hd=$('details.hint');if(hd){hd.open=hintOpenRound===state.round;hd.addEventListener('toggle',()=>{hintOpenRound=hd.open?state.round:0;});}updStudent();}
 let hintOpenRound=0;
 function facts(pl,s){const r=pl.role,f=[];
- if(ROLES[r].side==='s'){f.push(['Beschikbaar vermogen',num(maxQ(pl,s,state))+' MW']);f.push(['Marginale kosten',eur(mc(r,s))+'/MWh']);}
- if(r==='bat')f.push(['Laadtoestand',num(pl.soc)+' / '+BATMAX+' MWh']);
- if(r==='lev')f.push(['Vraag van je klanten',num(demandOf(state,s))+' MW']);
- if(r==='ind')f.push(['Waarde van je product','€120/MWh']);
- if(r==='ev')f.push(['Al geladen',num(pl.chg)+' van '+EVNEED+' MWh'],['Rondes over',SCEN.length-state.round+1]);
+ if(ROLES[r].side==='s'){f.push([tr('Beschikbaar vermogen','Available capacity'),num(maxQ(pl,s,state))+' MW']);f.push([tr('Marginale kosten','Marginal cost'),eur(mc(r,s))+'/MWh']);if((r==='wind'||r==='zon')&&s.sub)f.push([tr('Subsidie','Subsidy'),'€'+s.sub+'/MWh']);}
+ if(r==='bat')f.push([tr('Laadtoestand','State of charge'),num(pl.soc)+' / '+BATMAX+' MWh']);
+ if(r==='lev')f.push([tr('Vraag van je klanten','Your customers’ demand'),num(demandOf(state,s))+' MW']);
+ if(r==='ind')f.push([tr('Waarde van je product','Value of your product'),'€120/MWh']);
+ if(r==='ev')f.push([tr('Al geladen','Charged so far'),num(pl.chg)+' '+tr('van','of')+' '+EVNEED+' MWh'],[tr('Rondes over','Rounds left'),SCEN.length-state.round+1]);
  return f.map(([a,b])=>`<div class="resline"><span>${a}</span><b>${b}</b></div>`).join('');}
-function bidForm(pl,s){const k=state.round+'|'+pl.role;if(draftKey!==k){draft=defBid(pl,s,state);draftKey=k;}
+function bidForm(pl,s){const k=state.round+'|'+pl.role;if(draftKey!==k){draft={...defBid(pl,s,state),g:''};draftKey=k;}
  const sell=pl.role==='bat'?draft.m==='ontladen':ROLES[pl.role].side==='s';const mx=maxQ(pl,s,state,draft.m);if(draft.q>mx)draft.q=mx;
- const prev=state.result?`<p class="mute small">Vorige ronde (${SCEN[state.result.round-1].t}): ${state.result.P==null?'geen handel':eur(state.result.P)+'/MWh'}</p>`:'';
- return`<div class="card stack-v"><p class="event">${esc(s.ev)}</p>${prev}<div>${facts(pl,s)}</div>${state.hints!==false&&HINTS[pl.role]?`<details class="hint"><summary>Hint: tactiek voor deze ronde</summary><p>${SEASON==='standaard'?HINTS[pl.role][state.round-1]||'':autoHint(pl,s,state.round-1)}</p></details>`:''}</div>
+ const none=mx<=0&&pl.role!=='bat';
+ const prev=state.result?`<p class="mute small">${tr('Vorige ronde','Previous round')} (${SCEN[state.result.round-1].t}): ${state.result.P==null?tr('geen handel','no trade'):eur(state.result.P)+'/MWh'}</p>`:'';
+ const hint=SEASON==='standaard'?(LANG==='en'?HINTS_EN:HINTS)[pl.role][state.round-1]||'':autoHint(pl,s,state.round-1);
+ return`<div class="card stack-v"><p class="event">${esc(sev(s))}</p>${prev}<div>${facts(pl,s)}</div>${state.hints!==false?`<details class="hint"><summary>${tr('Hint: tactiek voor deze ronde','Hint: tactics for this round')}</summary><p>${hint}</p></details>`:''}</div>
  <form class="card stack-v" id="bid">
-  ${pl.role==='bat'?`<div class="seg"><button type="button" data-m="laden" class="${draft.m==='laden'?'on':''}">Laden (kopen)</button><button type="button" data-m="ontladen" class="${draft.m==='ontladen'?'on':''}">Ontladen (verkopen)</button></div>`:''}
-  <div><label for="q">${sell?'Hoeveel wil je verkopen?':'Hoeveel wil je kopen?'} <span class="mute">(max ${num(mx)} MW)</span></label>
-   <div class="row" style="flex-wrap:nowrap"><input type="range" id="qr" min="0" max="${mx}" step="5" value="${draft.q}" aria-label="Volume schuif"><input id="q" type="number" inputmode="numeric" min="0" max="${mx}" value="${draft.q}" style="width:110px;flex:none"></div></div>
-  <div><label for="p">${sell?'Minimumprijs (€/MWh)':'Maximumprijs (€/MWh)'}</label>
-   <div class="pin"><button type="button" class="ghost" data-d="-10" aria-label="10 lager">−</button><input id="p" type="number" inputmode="numeric" min="${FLOOR}" max="${CAP}" value="${draft.p}"><button type="button" class="ghost" data-d="10" aria-label="10 hoger">+</button></div>
-   <p class="mute small">${sell?'Je verkoopt alleen als de marktprijs minstens dit bedrag is.':'Je koopt alleen als de marktprijs hooguit dit bedrag is.'} Tussen ${FLOOR} en ${CAP}.</p></div>
-  <button class="acc" type="submit" id="sub">Bod indienen</button><p class="status" id="st" aria-live="polite"></p></form>`;}
-function bindForm(pl,s){const f=$('#bid');if(!f)return;const q=$('#q'),qr=$('#qr'),p=$('#p');
+  ${pl.role==='bat'?`<div class="seg"><button type="button" data-m="laden" class="${draft.m==='laden'?'on':''}">${tr('Laden (kopen)','Charge (buy)')}</button><button type="button" data-m="ontladen" class="${draft.m==='ontladen'?'on':''}">${tr('Ontladen (verkopen)','Discharge (sell)')}</button></div>`:''}
+  ${none?`<p class="event">${tr('Je hebt deze ronde geen vermogen. Je kunt wel de marktprijs voorspellen.','You have no capacity this round. You can still predict the market price.')}</p>`:`
+  <div><label for="q">${sell?tr('Hoeveel wil je verkopen?','How much do you want to sell?'):tr('Hoeveel wil je kopen?','How much do you want to buy?')} <span class="mute">(max ${num(mx)} MW)</span></label>
+   <div class="row" style="flex-wrap:nowrap"><input type="range" id="qr" min="0" max="${mx}" step="5" value="${draft.q}" aria-label="${tr('Volume schuif','Volume slider')}"><input id="q" type="number" inputmode="numeric" min="0" max="${mx}" value="${draft.q}" style="width:110px;flex:none"></div></div>
+  <div><label for="p">${sell?tr('Minimumprijs (€/MWh)','Minimum price (€/MWh)'):tr('Maximumprijs (€/MWh)','Maximum price (€/MWh)')}</label>
+   <div class="pin"><button type="button" class="ghost" data-d="-10" aria-label="${tr('10 lager','10 lower')}">−</button><input id="p" type="number" inputmode="numeric" min="${FLOOR}" max="${CAP}" value="${draft.p}"><button type="button" class="ghost" data-d="10" aria-label="${tr('10 hoger','10 higher')}">+</button></div>
+   <p class="mute small">${sell?tr('Je verkoopt alleen als de marktprijs minstens dit bedrag is.','You only sell if the market price is at least this amount.'):tr('Je koopt alleen als de marktprijs hooguit dit bedrag is.','You only buy if the market price is at most this amount.')} ${tr('Tussen','Between')} ${FLOOR} ${tr('en','and')} ${CAP}.</p></div>`}
+  <div class="pred"><label for="g">${tr('Voorspel de marktprijs (€/MWh)','Predict the market price (€/MWh)')}</label><input id="g" type="number" inputmode="numeric" min="${FLOOR}" max="${CAP}" placeholder="${tr('bijv. 95','e.g. 95')}" value="${draft.g??''}"><p class="mute small">${tr('Los van je bod. Hoe dichter bij de echte prijs, hoe meer voorspelpunten (max 100).','Separate from your bid. The closer to the actual price, the more prediction points (max 100).')}</p></div>
+  <button class="acc" type="submit" id="sub">${tr('Indienen','Submit')}</button><p class="status" id="st" aria-live="polite"></p></form>`;}
+function bindForm(pl,s){const f=$('#bid');if(!f)return;const q=$('#q'),qr=$('#qr'),p=$('#p'),g=$('#g');
  const dirty=()=>{if(submittedFor===draftKey){submittedFor='';lastSig='';}updStudent();};
- qr.addEventListener('input',()=>{q.value=qr.value;draft.q=+qr.value;dirty();});
- q.addEventListener('input',()=>{qr.value=q.value;draft.q=+q.value;dirty();});
- p.addEventListener('input',()=>{draft.p=+p.value;dirty();});
+ qr?.addEventListener('input',()=>{q.value=qr.value;draft.q=+qr.value;dirty();});
+ q?.addEventListener('input',()=>{qr.value=q.value;draft.q=+q.value;dirty();});
+ p?.addEventListener('input',()=>{draft.p=+p.value;dirty();});
+ g?.addEventListener('input',()=>{draft.g=g.value;dirty();});
  f.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>{draft.p=Math.max(FLOOR,Math.min(CAP,(+p.value||0)+ +b.dataset.d));p.value=draft.p;dirty();}));
  f.querySelectorAll('[data-m]').forEach(b=>b.addEventListener('click',()=>{draft.m=b.dataset.m;draft.q=maxQ(pl,s,state,draft.m);draft.p=draft.m==='laden'?30:120;submittedFor='';lastSig='';render();}));
- f.addEventListener('submit',e=>{e.preventDefault();const b=sanitize(draft,pl,s,state);if(!b)return toast('Vul een geldig volume en een geldige prijs in');
-  G.child('bids/'+state.round+'/'+uid).set(pl.role==='bat'?{q:b.q,p:b.p,m:b.m}:{q:b.q,p:b.p}).then(()=>{submittedFor=draftKey;lastSig='';render();}).catch(()=>toast('Indienen mislukt. Is de markt al gesloten?'));});}
-function updStudent(){const st=$('#st'),sub=$('#sub');if(st){const done=submittedFor===draftKey;st.textContent=done?'Bod ingediend. Je kunt het nog aanpassen tot de markt sluit.':'';if(sub)sub.textContent=done?'Bod bijwerken':'Bod indienen';}tick();}
+ f.addEventListener('submit',e=>{e.preventDefault();const b=sanitize(draft,pl,s,state);if(!b)return toast(tr('Vul een geldig volume en een geldige prijs in','Enter a valid volume and price'));
+  const o=pl.role==='bat'?{q:b.q,p:b.p,m:b.m}:{q:b.q,p:b.p};const gv=draft.g===''||draft.g==null?NaN:Math.round(Number(draft.g));if(isFinite(gv))o.g=Math.max(FLOOR,Math.min(CAP,gv));
+  G.child('bids/'+state.round+'/'+uid).set(o).then(()=>{submittedFor=draftKey;lastSig='';render();}).catch(()=>toast(tr('Indienen mislukt. Is de markt al gesloten?','Submitting failed. Is the market already closed?')));});}
+function updStudent(){const st=$('#st'),sub=$('#sub');if(st){const done=submittedFor===draftKey;st.textContent=done?tr('Ingediend. Je kunt het nog aanpassen tot de markt sluit.','Submitted. You can still change it until the market closes.'):'';if(sub)sub.textContent=done?tr('Bijwerken','Update'):tr('Indienen','Submit');}tick();}
 function resultCard(pl,end){const L=pl.last,res=state.result;
- if(end)return`<div class="card stack-v"><h2>Einde handelsdag</h2>${pl.pen?`<p class="neg">Boete voor ${num(EVNEED-pl.chg)} MWh die je niet hebt geladen: ${eur(pl.pen)}</p>`:''}${pl.pct!=null?`<div><div class="resline"><span>Score</span><b>${pctTxt(pl.pct)} van je potentieel</b></div>${pl.role==='lev'?`<div class="resline"><span>Jouw inkoopkosten</span><b>${eur(pl.cost||0)}</b></div><div class="resline"><span>Ideale inkoopkosten</span><b>${eur(pl.pot)}</b></div>`:`<div class="resline"><span>Jouw resultaat</span><b>${eur(pl.tot)}</b></div><div class="resline"><span>Maximaal haalbaar</span><b>${eur(pl.pot)}</b></div>`}</div>${pl.tag?'<p class="mute small">Je had vandaag geen winstkans; zonder verlies scoor je 100%.</p>':''}`:''}<p class="mute">Kijk naar het scherm voor de eindstand en de nabespreking.</p></div>`;
- if(!L||L.r!==state.round)return`<div class="card"><p class="mute">Je hebt deze ronde niet geboden.</p></div>`;
+ if(end)return`<div class="card stack-v"><h2>${tr('Einde handelsdag','End of trading day')}</h2>${pl.pen?`<p class="neg">${tr(`Boete voor ${num(EVNEED-pl.chg)} MWh die je niet hebt geladen: ${eur(pl.pen)}`,`Penalty for ${num(EVNEED-pl.chg)} MWh you did not charge: ${eur(pl.pen)}`)}</p>`:''}${pl.pct!=null?`<div><div class="resline"><span>Score</span><b>${pctTxt(pl.pct)} ${tr('van je potentieel','of your potential')}</b></div>${pl.role==='lev'?`<div class="resline"><span>${tr('Jouw inkoopkosten','Your purchase costs')}</span><b>${eur(pl.cost||0)}</b></div><div class="resline"><span>${tr('Ideale inkoopkosten','Ideal purchase costs')}</span><b>${eur(pl.pot)}</b></div>`:`<div class="resline"><span>${tr('Jouw resultaat','Your result')}</span><b>${eur(pl.tot)}</b></div><div class="resline"><span>${tr('Maximaal haalbaar','Maximum achievable')}</span><b>${eur(pl.pot)}</b></div>`}</div>${pl.tag?`<p class="mute small">${tr('Je had vandaag geen winstkans; zonder verlies scoor je 100%.','You had no profit opportunity today; without a loss you score 100%.')}</p>`:''}`:''}<p class="mute">${tr('Kijk naar het scherm voor de eindstand en de nabespreking.','Look at the screen for the final ranking and debrief.')}</p></div>`;
+ if(!L||L.r!==state.round)return`<div class="card"><p class="mute">${tr('Je hebt deze ronde niet geboden.','You did not bid this round.')}</p></div>`;
  const sell=pl.role==='bat'?L.bid?.m==='ontladen':ROLES[pl.role].side==='s';
- return`<div class="card stack-v"><h2>Uitslag ${SCEN[state.round-1].t}</h2><div><div class="resline"><span>Marktprijs</span><b>${res?.P==null?'geen handel':eur(res.P)+'/MWh'}</b></div>
-  <div class="resline"><span>Jouw bod</span><b>${L.bid?num(L.bid.q)+' MW @ '+eur(L.bid.p):'geen bod'}</b></div>
-  <div class="resline"><span>${sell?'Verkocht':'Gekocht'}</span><b>${num(L.q)} MW</b></div>
-  <div class="resline"><span>Resultaat deze ronde</span><b class="${L.pr<0?'neg':'pos'}">${eur(L.pr)}</b></div></div>${L.note?`<p class="mute small">${esc(L.note)}</p>`:''}<p class="mute small pulse">Wachten op de volgende ronde…</p></div>`;}
+ return`<div class="card stack-v"><h2>${tr('Uitslag','Result')} ${SCEN[state.round-1].t}</h2><div><div class="resline"><span>${tr('Marktprijs','Market price')}</span><b>${res?.P==null?tr('geen handel','no trade'):eur(res.P)+'/MWh'}</b></div>
+  <div class="resline"><span>${tr('Jouw bod','Your bid')}</span><b>${L.bid&&L.bid.q>0?num(L.bid.q)+' MW @ '+eur(L.bid.p):tr('geen bod','no bid')}</b></div>
+  <div class="resline"><span>${sell?tr('Verkocht','Sold'):tr('Gekocht','Bought')}</span><b>${num(L.q)} MW</b></div>
+  <div class="resline"><span>${tr('Resultaat deze ronde','Result this round')}</span><b class="${L.pr<0?'neg':'pos'}">${eur(L.pr)}</b></div>
+  ${L.g!=null?`<div class="resline"><span>${tr('Jouw voorspelling','Your prediction')} (${eur(L.g)})</span><b class="pos">+${num(L.gp||0)} ${tr('punten','points')}</b></div>`:''}</div>${noteTxt(L)?`<p class="mute small">${esc(noteTxt(L))}</p>`:''}<p class="mute small pulse">${tr('Wachten op de volgende ronde…','Waiting for the next round…')}</p></div>`;}
 
 /* ---------- teacher events ---------- */
 document.addEventListener('click',e=>{if(!teacher)return;const t=e.target.closest('button');if(!t||!state)return;const a=t.dataset.a;
@@ -624,38 +719,44 @@ document.addEventListener('click',e=>{if(!teacher)return;const t=e.target.closes
  else if(t.dataset.role){const st=clone(state),p=st.players[t.dataset.role];if(p){p.role=ORDER[(ORDER.indexOf(p.role)+1)%ORDER.length];save(st);}}
  else if(t.dataset.del){const k=t.dataset.del,st=clone(state);delete st.players[k];if(!k.startsWith('bot-'))G.child('players/'+k).remove().catch(()=>{});save(st);}});
 
+/* ---------- language switch (alle schermen) ---------- */
+document.addEventListener('click',e=>{const b=e.target.closest('[data-lang]');if(!b)return;const l=b.dataset.lang;if(l===LANG)return;LANG=l;try{localStorage.setItem('sb-lang',l);}catch(_){}document.documentElement.lang=l;heroLast='';lastSig='';
+ if(G&&loaded)render();else if(landingView)landingView();});
+let landingView=null;
 /* ---------- landing & setup ---------- */
-function heroSimple(t,sub){document.body.dataset.view='landing';setScene(0,{show:true});setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div></div><div class="hero-main"><div><p class="eyebrow">${sub}</p><h1 class="clock" style="font-size:clamp(44px,8vw,96px)">${t}</h1></div></div>`);}
-function renderSetup(){heroSimple('Stroombeurs','SETUP');$('#app').innerHTML=`<div class="phone stack-v"><div class="card stack-v"><p><b>Nog niet gekoppeld aan Firebase.</b></p><p class="mute">Vul je Firebase-gegevens in <code>config.js</code> in. De stappen staan in de README.</p></div></div>`;}
-function renderLanding(){const last=store.get('sb-last-game');
- heroSimple('Stroombeurs','HANDELSSPEL · DAY-AHEAD ELEKTRICITEITSMARKT');$('#app').innerHTML=`<div class="phone stack-v">
- <form class="card stack-v" id="code"><h2>Meedoen als student</h2><div><label for="c">Spelcode</label><input id="c" maxlength="6" autocapitalize="characters" autocomplete="off" required></div><button class="acc" type="submit">Naar het spel</button></form>
- <div class="card stack-v"><h2>Docent</h2><p class="mute small">Start een nieuw spel en laat studenten de QR-code scannen.</p><button id="new">Nieuw spel starten</button>
- ${last?`<button class="ghost" id="last">Terug naar spel ${esc(last)}</button>`:''}</div></div>`;
+function heroSimple(t,sub){document.body.dataset.view='landing';setScene(0,{show:true});setHero(`<div class="hero-top"><div class="brand">${BOLT}Stroombeurs</div>${langSw()}</div><div class="hero-main"><div><p class="eyebrow">${sub}</p><h1 class="clock" style="font-size:clamp(44px,8vw,96px)">${t}</h1></div></div>`);}
+function renderSetup(){landingView=renderSetup;heroSimple('Stroombeurs','SETUP');$('#app').innerHTML=`<div class="phone stack-v"><div class="card stack-v"><p><b>${tr('Nog niet gekoppeld aan Firebase.','Not connected to Firebase yet.')}</b></p><p class="mute">${tr('Vul je Firebase-gegevens in <code>config.js</code> in. De stappen staan in de README.','Fill in your Firebase settings in <code>config.js</code>. The steps are in the README.')}</p></div></div>`;}
+function renderLanding(){landingView=renderLanding;const last=store.get('sb-last-game');
+ heroSimple('Stroombeurs',tr('HANDELSSPEL · DAY-AHEAD ELEKTRICITEITSMARKT','TRADING GAME · DAY-AHEAD ELECTRICITY MARKET'));$('#app').innerHTML=`<div class="phone stack-v">
+ <form class="card stack-v" id="code"><h2>${tr('Meedoen als student','Join as a student')}</h2><div><label for="c">${tr('Spelcode','Game code')}</label><input id="c" maxlength="6" autocapitalize="characters" autocomplete="off" required></div><button class="acc" type="submit">${tr('Naar het spel','Go to game')}</button></form>
+ <div class="card stack-v"><h2>${tr('Docent','Teacher')}</h2><p class="mute small">${tr('Start een nieuw spel en laat studenten de QR-code scannen.','Start a new game and have students scan the QR code.')}</p><button id="new">${tr('Nieuw spel starten','Start new game')}</button>
+ ${last?`<button class="ghost" id="last">${tr('Terug naar spel','Back to game')} ${esc(last)}</button>`:''}</div></div>`;
  $('#code').addEventListener('submit',e=>{e.preventDefault();const c=$('#c').value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(c)location.search='?spel='+c;});
  $('#new').addEventListener('click',createGame);$('#last')?.addEventListener('click',()=>location.search='?spel='+last);}
+function renderMsg(sub,title,body){landingView=()=>renderMsg(sub,title,body);heroSimple('Stroombeurs',tr(...sub));$('#app').innerHTML=`<div class="phone stack-v"><div class="card stack-v"><p><b>${tr(...title)}</b></p>${body()}</div></div>`;}
 async function createGame(){const b=$('#new');if(b)b.disabled=true;
  for(let i=0;i<6;i++){const c=Array.from({length:4},()=>ALPH[Math.floor(Math.random()*ALPH.length)]).join('');
-  try{await fdb.ref('owners/'+c).set(uid);await fdb.ref('games/'+c+'/state').set(JSON.parse(JSON.stringify(freshState())));store.set('sb-last-game',c);location.search='?spel='+c;return;}catch(e){if(i===5)toast('Spel aanmaken mislukt: '+(e?.code||'fout'));}}
+  try{await fdb.ref('owners/'+c).set(uid);await fdb.ref('games/'+c+'/state').set(JSON.parse(JSON.stringify(freshState())));store.set('sb-last-game',c);location.search='?spel='+c;return;}catch(e){if(i===5)toast(tr('Spel aanmaken mislukt: ','Creating game failed: ')+(e?.code||'error'));}}
  if(b)b.disabled=false;}
 
 /* ---------- boot ---------- */
 (async()=>{
+ document.documentElement.lang=LANG;
  const cfg=window.FIREBASE_CONFIG;
  if(!window.firebase||!cfg||!cfg.apiKey||/VUL|YOUR/i.test(cfg.apiKey)){renderSetup();return;}
  try{firebase.initializeApp(cfg);fdb=firebase.database();await firebase.auth().signInAnonymously();uid=firebase.auth().currentUser.uid;}
- catch(e){heroSimple('Stroombeurs','VERBINDING');$('#app').innerHTML=`<div class="phone"><div class="card"><p><b>Verbinden met Firebase mislukt.</b></p><p class="mute">${esc(e?.code||e?.message||'')}</p><p class="mute small">Staat anoniem inloggen aan in Firebase Authentication?</p></div></div>`;return;}
+ catch(e){const m=esc(e?.code||e?.message||'');renderMsg(['VERBINDING','CONNECTION'],['Verbinden met Firebase mislukt.','Connecting to Firebase failed.'],()=>`<p class="mute">${m}</p><p class="mute small">${tr('Staat anoniem inloggen aan in Firebase Authentication?','Is anonymous sign-in enabled in Firebase Authentication?')}</p>`);return;}
  fdb.ref('.info/serverTimeOffset').on('value',s=>{offset=s.val()||0;});
  const qs=new URLSearchParams(location.search);code=(qs.get('spel')||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
  if(!code){renderLanding();return;}
  const owner=(await fdb.ref('owners/'+code).get().catch(()=>null))?.val();
- if(!owner){heroSimple('Stroombeurs','SPEL NIET GEVONDEN');$('#app').innerHTML=`<div class="phone stack-v"><div class="card"><p><b>Spel ${esc(code)} bestaat niet.</b></p><p class="mute">Controleer de code bij je docent.</p><p><a href="${esc(location.pathname)}">Andere code invoeren</a></p></div></div>`;return;}
+ if(!owner){renderMsg(['SPEL NIET GEVONDEN','GAME NOT FOUND'],[`Spel ${code} bestaat niet.`,`Game ${code} does not exist.`],()=>`<p class="mute">${tr('Controleer de code bij je docent.','Check the code with your teacher.')}</p><p><a href="${esc(location.pathname)}">${tr('Andere code invoeren','Enter another code')}</a></p>`);return;}
  teacher=owner===uid&&!qs.has('speler');me.key=uid;G=fdb.ref('games/'+code);
  if(teacher)store.set('sb-last-game',code);
- const tm=setTimeout(()=>{if(!loaded){loaded=true;toast('De markt reageert nog niet. Even geduld…');render();}},10000);
- G.child('state').on('value',s=>{clearTimeout(tm);loaded=true;state=norm(s.val());syncPlayers();watchMyBid();schedule();},e=>{clearTimeout(tm);loaded=true;toast('Marktdata niet bereikbaar ('+(e?.code||'fout')+')');schedule();});
+ const tm=setTimeout(()=>{if(!loaded){loaded=true;toast(tr('De markt reageert nog niet. Even geduld…','The market is not responding yet. Please wait…'));render();}},10000);
+ G.child('state').on('value',s=>{clearTimeout(tm);loaded=true;state=norm(s.val());syncPlayers();watchMyBid();schedule();},e=>{clearTimeout(tm);loaded=true;toast(tr('Marktdata niet bereikbaar','Market data unavailable')+' ('+(e?.code||'error')+')');schedule();});
  G.child('players').on('value',s=>{playersNode=s.val()||{};syncPlayers();schedule();},()=>{});
- if(teacher)G.child('bids').on('value',s=>{bidsNode=s.val()||{};schedule();},e=>toast('Biedingen niet leesbaar ('+(e?.code||'fout')+')'));
+ if(teacher)G.child('bids').on('value',s=>{bidsNode=s.val()||{};schedule();},e=>toast(tr('Biedingen niet leesbaar','Bids not readable')+' ('+(e?.code||'error')+')'));
  else{const nm=store.get('sb-name-'+code);if(nm)join(nm);
   fdb.ref('.info/connected').on('value',s=>{if(s.val()&&joined)G.child('players/'+uid).update({on:true}).catch(()=>{});});}
  render();

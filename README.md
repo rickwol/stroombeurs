@@ -55,6 +55,8 @@ Lokaal testen kan ook. Draai `python3 -m http.server` in deze map en open <http:
 4. Na zes rondes volgen de eindstand, de beste speler per rol en het prijsverloop van de dag.
 
 **Tips**
+- **Prijsvoorspelling:** naast hun bod voorspellen studenten elke ronde de marktprijs. Hoe dichter bij de echte prijs, hoe meer punten (max 100 per ronde, naar verhouding van de prijs). Er is een aparte ranglijst voor de beste voorspellers. Ook spelers zonder vermogen in een ronde, zoals het zonnepark 's nachts, kunnen zo meedoen.
+- **Nederlands / English:** rechtsboven staat een NL/EN-schakelaar. De keuze wordt per apparaat onthouden: het docentscherm kan Nederlands zijn terwijl een student in het Engels speelt.
 - Studenten kunnen per ronde een **hint** openen met een tactiek voor hun rol in dat scenario. Met de knop **Hints aan/uit** op het docentscherm zet je ze voor iedereen uit, bijvoorbeeld in een tweede speelronde.
 - Weinig studenten? Klik op **Aanvullen met bots**. Dan komt er alleen een bot bij voor elke rol die nog geen speler heeft. Een bot verwijder je met het kruisje.
 - Zelf de studentenweergave bekijken: open de spellink in een privévenster of op je telefoon.
